@@ -27,6 +27,14 @@ class AdminUserMixin:
     def get_id(self):
         return str(self.id)
     
+    @property
+    def is_authenticated(self):
+        return True
+    
+    @property  
+    def is_anonymous(self):
+        return False
+    
     def to_dict(self):
         return {
             'id': self.id,
