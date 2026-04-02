@@ -97,7 +97,22 @@ class AdminPro:
         @bp.route('/')
         def index():
             if self.auth.is_authenticated():
-                return render_template('admin/dashboard.html', user=self.auth.get_current_user())
+                # Get stats for dashboard
+                try:
+                    users_response = self.db.session.query(self.AdminUser).count()
+                    models_response = len(self.adapter.get_models())
+                    monitor_response = self.monitor.get_stats(range_hours=24)
+                    
+                    stats = {
+                        'user_count': users_response,
+                        'model_count': models_response,
+                        'request_count': monitor_response.get('total_requests', 0),
+                        'error_rate': monitor_response.get('error_rate', 0)
+                    }
+                except Exception:
+                    stats = {'user_count': 0, 'model_count': 0, 'request_count': 0, 'error_rate': 0}
+                
+                return render_template('admin/dashboard.html', user=self.auth.get_current_user(), stats=stats)
             return redirect(url_for('admin.login'))
         
         @bp.route('/login')
