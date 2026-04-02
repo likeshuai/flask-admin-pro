@@ -4,8 +4,7 @@ Flask Admin Pro - Main Blueprint and initialization.
 
 import time
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from .extensions import login_manager, csrf
-from .models import AdminUser, RequestLog
+from .models import db, AdminUser, RequestLog
 from .core.auth import AuthManager
 from .core.crud import CRUDManager
 from .core.orm_adapter import ORMAdapter
@@ -41,7 +40,7 @@ class AdminPro:
         
         # Initialize extensions with the provided db or create internal one
         if self.db is None:
-            from .extensions import db as internal_db
+            from .models import db as internal_db
             internal_db.init_app(app)
             self.db = internal_db
         else:

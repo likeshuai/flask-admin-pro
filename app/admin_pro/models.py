@@ -4,8 +4,10 @@ Database models for Flask Admin Pro.
 
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from .extensions import db
+from flask_sqlalchemy import SQLAlchemy
 
+# Create a single db instance for AdminPro
+db = SQLAlchemy()
 
 class AdminUser(db.Model):
     """Admin user model."""
