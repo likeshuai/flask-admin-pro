@@ -88,54 +88,22 @@
             </div>
         </div>
     </div>
+    
+    <!-- Global page data -->
+    <script>
+        // Global configuration for the current page
+        window.adminPageConfig = {
+            route: '{{ request.endpoint or "" }}',
+            user: {{ user.to_dict()|tojson if user else '{}' }},
+            pageTitle: '{% block title %}Flask Admin Pro{% endblock %}',
+            {% block page_data %}{% endblock %}
+        };
+    </script>
+    
+    <!-- External JavaScript files -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/element-plus"></script>
-    <script>
-        const { createApp, ref, reactive, onMounted } = Vue;
-        createApp({
-            setup() {
-                const currentRoute = ref(window.location.pathname.replace('/__admin__', '') || '/');
-                const userMenuVisible = ref(false);
-                const user = reactive({ username: '{{ user.username if user else "" }}' });
-                
-                const showUserMenu = () => {
-                    userMenuVisible.value = !userMenuVisible.value;
-                };
-                
-                const logout = async () => {
-                    try {
-                        await fetch('/__admin__/api/logout', { method: 'POST' });
-                        window.location.href = '/__admin__/login';
-                    } catch (e) {
-                        ElementPlus.ElMessage.error('退出失败');
-                    }
-                };
-                
-                const handleThemeChange = (theme) => {
-                    document.documentElement.setAttribute('data-theme', theme);
-                    localStorage.setItem('admin-theme', theme);
-                    ElementPlus.ElMessage.success('主题已切换');
-                };
-                
-                // Load saved theme
-                onMounted(() => {
-                    const savedTheme = localStorage.getItem('admin-theme');
-                    if (savedTheme) {
-                        document.documentElement.setAttribute('data-theme', savedTheme);
-                    }
-                });
-                
-                return {
-                    currentRoute,
-                    userMenuVisible,
-                    user,
-                    showUserMenu,
-                    logout,
-                    handleThemeChange
-                };
-            }
-        }).use(ElementPlus).mount('#app');
-    </script>
+    <script src="{{ url_for('admin.static', filename='admin/js/admin.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -86,50 +86,7 @@
     </el-card>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dashboardApp = {
-        data() {
-            return {
-                stats: { user_count: 0, model_count: 0, request_count: 0, error_rate: 0 }
-            };
-        },
-        methods: {
-            goTo(path) {
-                window.location.href = path;
-            },
-            async loadStats() {
-                try {
-                    // Load user count
-                    const usersRes = await fetch('/__admin__/api/users?page=1&per_page=1');
-                    const usersData = await usersRes.json();
-                    this.stats.user_count = usersData.total || 0;
-                    
-                    // Load model count  
-                    const modelsRes = await fetch('/__admin__/api/models');
-                    const modelsData = await modelsRes.json();
-                    this.stats.model_count = modelsData.models?.length || 0;
-                    
-                    // Load monitor stats
-                    const monitorRes = await fetch('/__admin__/api/monitor/stats?range=24');
-                    const monitorData = await monitorRes.json();
-                    this.stats.request_count = monitorData.total_requests || 0;
-                    this.stats.error_rate = monitorData.error_rate || 0;
-                    
-                } catch (error) {
-                    console.error('Failed to load stats:', error);
-                }
-            }
-        },
-        async mounted() {
-            await this.loadStats();
-        }
-    };
-    
-    if (document.getElementById('dashboard-app')) {
-        const { createApp } = Vue;
-        createApp(dashboardApp).use(ElementPlus).mount('#dashboard-app');
-    }
-});
-</script>
+{% block page_data %}
+stats: {{ stats|tojson }}
+{% endblock %}
 {% endblock %}
