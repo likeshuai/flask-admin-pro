@@ -150,7 +150,12 @@ class AdminPro:
         def monitor():
             if not self.auth.is_authenticated():
                 return redirect(url_for('admin.login'))
-            return render_template('admin/monitor.html', user=self.auth.get_current_user())
+            # Get stats for monitor page
+            try:
+                stats = self.monitor.get_stats(range_hours=24)
+            except Exception:
+                stats = {}
+            return render_template('admin/monitor.html', user=self.auth.get_current_user(), stats=stats)
         
         @bp.route('/api/login', methods=['POST'])
         def api_login():
