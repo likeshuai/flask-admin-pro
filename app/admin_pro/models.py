@@ -3,13 +3,13 @@ Database models for Flask Admin Pro.
 """
 
 from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
+from .model_mixins import AdminUserMixin, RequestLogMixin
 
 
 def create_admin_models(db):
     """Create AdminPro models using the provided db instance."""
     
-    class AdminUser(db.Model):
+    class AdminUser(AdminUserMixin, db.Model):
         __tablename__ = 'admin_users'
         
         id = db.Column(db.Integer, primary_key=True)
@@ -21,30 +21,10 @@ def create_admin_models(db):
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
         updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
         
-        def set_password(self, password):
-            self.password_hash = generate_password_hash(password)
-        
-        def check_password(self, password):
-            return check_password_hash(self.password_hash, password)
-        
-        def get_id(self):
-            return str(self.id)
-        
-        def to_dict(self):
-            return {
-                'id': self.id,
-                'username': self.username,
-                'email': self.email,
-                'role': self.role,
-                'is_active': self.is_active,
-                'created_at': self.created_at.isoformat() if self.created_at else None,
-                'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            }
-        
         def __repr__(self):
             return f'<AdminUser {self.username}>'
 
-    class RequestLog(db.Model):
+    class RequestLog(RequestLogMixin, db.Model):
         __tablename__ = 'request_logs'
         
         id = db.Column(db.Integer, primary_key=True)
@@ -54,17 +34,6 @@ def create_admin_models(db):
         response_time = db.Column(db.Float)
         ip_address = db.Column(db.String(45))
         created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-        
-        def to_dict(self):
-            return {
-                'id': self.id,
-                'method': self.method,
-                'path': self.path,
-                'status_code': self.status_code,
-                'response_time': self.response_time,
-                'ip_address': self.ip_address,
-                'created_at': self.created_at.isoformat() if self.created_at else None,
-            }
         
         def __repr__(self):
             return f'<RequestLog {self.method} {self.path}>'

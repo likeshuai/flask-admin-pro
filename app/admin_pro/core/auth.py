@@ -9,8 +9,9 @@ from functools import wraps
 class AuthManager:
     """Handle authentication and authorization."""
     
-    def __init__(self, app=None):
+    def __init__(self, app=None, AdminUser=None):
         self.app = app
+        self.AdminUser = AdminUser
         if app is not None:
             self.init_app(app)
     
@@ -18,9 +19,10 @@ class AuthManager:
         self.app = app
     
     def authenticate(self, username, password):
-        from ..models import AdminUser
+        if not self.AdminUser:
+            return None
         
-        user = AdminUser.query.filter_by(username=username).first()
+        user = self.AdminUser.query.filter_by(username=username).first()
         if user and user.check_password(password) and user.is_active:
             return user
         return None

@@ -53,7 +53,8 @@ class AdminPro:
         
         self.crud = CRUDManager(db)
         self.adapter = ORMAdapter(db)
-        self.monitor = MonitorManager(db)
+        self.monitor = MonitorManager(db, RequestLog)
+        self.auth = AuthManager(app, AdminUser)
         
         @login_manager.user_loader
         def load_user(user_id):
