@@ -95,7 +95,6 @@
         window.adminPageConfig = {
             route: '{{ request.endpoint or "" }}',
             user: {{ user.to_dict()|tojson if user else '{}' }},
-            pageTitle: '{% block title %}Flask Admin Pro{% endblock %}',
             {% block page_data %}{% endblock %}
         };
     </script>
