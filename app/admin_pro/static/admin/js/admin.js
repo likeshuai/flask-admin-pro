@@ -11,7 +11,7 @@ const pageComponents = {
     dashboard: {
         data() {
             return {
-                stats: { user_count: 0, model_count: 0, request_count: 0, error_rate: 0 }
+                stats: window.adminPageConfig.stats || { user_count: 0, model_count: 0, request_count: 0, error_rate: 0 }
             };
         },
         methods: {
@@ -321,19 +321,21 @@ const app = createApp({
 document.addEventListener('DOMContentLoaded', function() {
     app.use(ElementPlus).mount('#app');
     
-    // Mount additional page components if they exist
+    // Mount page-specific components if they exist
     const routeMap = {
-        'admin.index': 'dashboard',
-        'admin.users': 'users', 
-        'admin.models': 'models',
-        'admin.monitor': 'monitor'
+        'admin.index': { component: 'dashboard', element: '#dashboard-app' },
+        'admin.users': { component: 'users', element: '#users-app' }, 
+        'admin.models': { component: 'models', element: '#models-app' },
+        'admin.monitor': { component: 'monitor', element: '#monitor-app' }
     };
     
     const currentPage = window.adminPageConfig.route;
-    const componentName = routeMap[currentPage];
+    const pageConfig = routeMap[currentPage];
     
-    if (componentName && pageComponents[componentName]) {
-        // For pages that need additional functionality beyond the base layout
-        // This can be extended as needed
+    if (pageConfig && pageComponents[pageConfig.component]) {
+        const { createApp } = Vue;
+        createApp(pageComponents[pageConfig.component])
+            .use(ElementPlus)
+            .mount(pageConfig.element);
     }
 });
