@@ -307,7 +307,11 @@ class AdminPro:
             
             result = self.crud.get_all(model, page=page, per_page=per_page, 
                                        search=search, sort_by=sort_by, sort_order=sort_order)
-            result['columns'] = self.adapter.get_model_info(model)['columns']
+            model_info = self.adapter.get_model_info(model)
+            if model_info:
+                result['columns'] = model_info['columns']
+            else:
+                result['columns'] = []
             
             return jsonify(result)
         

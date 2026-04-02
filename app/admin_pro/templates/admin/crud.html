@@ -32,9 +32,9 @@
                 min-width="120"
             >
                 <template #default="scope">
-                    {% raw %}<span v-if="col.is_datetime">{{ formatDateTime(scope.row[col.name]) }}</span>
+                    {% raw %}<span v-if="col.is_datetime && scope.row[col.name]">{{ formatDateTime(scope.row[col.name]) }}</span>
                     <span v-else-if="col.is_boolean">{{ scope.row[col.name] ? '✅' : '❌' }}</span>
-                    <span v-else>{{ scope.row[col.name] }}</span>{% endraw %}
+                    <span v-else>{{ scope.row[col.name] || '' }}</span>{% endraw %}
                 </template>
             </el-table-column>
             <el-table-column label="操作" width="200" fixed="right">
@@ -48,6 +48,14 @@
                 </template>
             </el-table-column>
         </el-table>
+        
+        <div v-if="data.length === 0 && !loading" class="empty-state">
+            <i class="el-icon-document"></i>
+            <p>暂无数据</p>
+            <el-button type="primary" @click="showCreate" style="margin-top: 16px;">
+                <i class="el-icon-plus"></i> 新增记录
+            </el-button>
+        </div>
         
         <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
             <el-pagination
