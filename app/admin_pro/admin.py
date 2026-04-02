@@ -4,11 +4,17 @@ Flask Admin Pro - Main Blueprint and initialization.
 
 import time
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
 from .models import db, AdminUser, RequestLog
 from .core.auth import AuthManager
 from .core.crud import CRUDManager
 from .core.orm_adapter import ORMAdapter
 from .core.monitor import MonitorManager
+
+# Initialize extensions
+login_manager = LoginManager()
+csrf = CSRFProtect()
 
 
 class AdminPro:
