@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flask-admin-pro"
+version = "1.0.0"
+description = "A plug-and-play admin panel for Flask applications with Element Plus UI"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Flask Admin Pro Team"}
+]
+requires-python = ">=3.6"
+classifiers = [
+    "Framework :: Flask",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "Flask>=2.0.0",
+    "Flask-SQLAlchemy>=3.0.0",
+    "Flask-Login>=0.6.0",
+    "Flask-WTF>=1.0.0",
+    "Werkzeug>=2.0.0",
+    "bcrypt>=4.0.0",
+    "SQLAlchemy>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/flask-admin-pro/flask-admin-pro"
+Documentation = "https://flask-admin-pro.readthedocs.io"
+Repository = "https://github.com/flask-admin-pro/flask-admin-pro"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+flask_admin_pro = [
+    "templates/**/*.html",
+    "static/**/*",
+]
