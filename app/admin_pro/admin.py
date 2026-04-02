@@ -1,3 +1,97 @@
+"""
+Flask Admin Pro - Main Blueprint and initialization.
+"""
+
+import time
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
+from .core.auth import AuthManager
+from .core.crud import CRUDManager
+from .core.orm_adapter import ORMAdapter
+from .core.monitor import MonitorManager
+
+# Initialize extensions
+login_manager = LoginManager()
+csrf = CSRFProtect()
+
+
+class AdminPro:
+    """Flask Admin Pro main class."""
+    
+    def __init__(self, app=None, db=None, database_uri=None, **kwargs):
+        self.app = app
+        self.db = db
+        self.database_uri = database_uri
+        self.auth = AuthManager()
+        self.crud = None
+        self.adapter = None
+        self.monitor = None
+        
+        if app is not None and db is not None:
+            self.init_app(app, db, database_uri, **kwargs)
+    
+    def init_app(self, app, db, database_uri=None, **kwargs):
+        self.app = app
+        self.db = db
+        self.database_uri = database_uri or 'sqlite:///admin.db'
+        
+        # Configure separate database for AdminPro
+        app.config.setdefault('ADMIN_DATABASE_URI', self.database_uri)
+        app.config.setdefault('ADMIN_USERNAME', 'admin')
+        app.config.setdefault('ADMIN_PASSWORD', 'admin123')
+        app.config.setdefault('ADMIN_ENABLE_MONITOR', True)
+        
+        # Create models using the provided db instance
+        from .models import create_admin_models
+        AdminUser, RequestLog = create_admin_models(db)
+        self.AdminUser = AdminUser
+        self.RequestLog = RequestLog
+        
+        login_manager.init_app(app)
+        csrf.init_app(app)
+        
+        self.crud = CRUDManager(db)
+        self.adapter = ORMAdapter(db)
+        self.monitor = MonitorManager(db)
+        
+        @login_manager.user_loader
+        def load_user(user_id):
+            return db.session.get(AdminUser, int(user_id))
+        
+        admin_bp = Blueprint('admin', __name__, 
+                            url_prefix='/__admin__',
+                            template_folder='templates',
+                            static_folder='static')
+        
+        self._register_routes(admin_bp)
+        csrf.exempt(admin_bp)
+        
+        app.register_blueprint(admin_bp)
+        
+        # Create tables in the main database (since we're sharing the db instance)
+        with app.app_context():
+            db.create_all()
+            self._create_default_admin(app)
+        
+        if app.config.get('ADMIN_ENABLE_MONITOR', True):
+            @app.before_request
+            def before_request():
+                request.start_time = time.time()
+            
+            @app.after_request
+            def after_request(response):
+                if hasattr(request, 'start_time') and request.path.startswith('/__admin__/api/'):
+                    response_time = (time.time() - request.start_time) * 1000
+                    self.monitor.log_request(
+                        method=request.method,
+                        path=request.path,
+                        status_code=response.status_code,
+                        response_time=response_time,
+                        ip_address=request.remote_addr,
+                    )
+                return response
+    
     def _register_routes(self, bp):
         @bp.route('/')
         def index():
@@ -269,3 +363,18 @@
                                          status_min=status_min)
             
             return jsonify(logs)
+    
+    def _create_default_admin(self, app):
+        username = app.config.get('ADMIN_USERNAME', 'admin')
+        password = app.config.get('ADMIN_PASSWORD', 'admin123')
+        
+        existing = self.db.session.query(self.AdminUser).filter_by(username=username).first()
+        if not existing:
+            user = self.AdminUser(
+                username=username,
+                role='admin',
+                is_active=True,
+            )
+            user.set_password(password)
+            self.db.session.add(user)
+            self.db.session.commit()
