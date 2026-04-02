@@ -32,9 +32,9 @@
                 min-width="120"
             >
                 <template #default="scope">
-                    {% raw %}<span v-if="col.is_datetime && scope.row[col.name]">{{ formatDateTime(scope.row[col.name]) }}</span>
+                    <span v-if="col.is_datetime && scope.row[col.name]">{{ formatDateTime(scope.row[col.name]) }}</span>
                     <span v-else-if="col.is_boolean">{{ scope.row[col.name] ? '✅' : '❌' }}</span>
-                    <span v-else>{{ scope.row[col.name] || '' }}</span>{% endraw %}
+                    <span v-else>{{ scope.row[col.name] || '' }}</span>
                 </template>
             </el-table-column>
             <el-table-column label="操作" width="200" fixed="right">

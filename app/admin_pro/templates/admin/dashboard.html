@@ -2,14 +2,14 @@
 {% block title %}仪表盘 - Flask Admin Pro{% endblock %}
 {% block breadcrumb %}仪表盘{% endblock %}
 {% block content %}
-<div id="dashboard-app">
+<div id="dashboard-app" v-cloak>
     <div class="stat-grid">
         <div class="stat-card" style="background: linear-gradient(135deg, #409EFF 0%, #667eea 100%);">
             <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
                 👥
             </div>
             <div class="stat-info">
-                <div class="stat-value">{% raw %}{{ stats.user_count || 0 }}{% endraw %}</div>
+                <div class="stat-value">{{ stats.user_count }}</div>
                 <div class="stat-label">用户总数</div>
             </div>
         </div>
@@ -18,7 +18,7 @@
                 📁
             </div>
             <div class="stat-info">
-                <div class="stat-value">{% raw %}{{ stats.model_count || 0 }}{% endraw %}</div>
+                <div class="stat-value">{{ stats.model_count }}</div>
                 <div class="stat-label">数据模型</div>
             </div>
         </div>
@@ -27,7 +27,7 @@
                 📊
             </div>
             <div class="stat-info">
-                <div class="stat-value">{% raw %}{{ stats.request_count || 0 }}{% endraw %}</div>
+                <div class="stat-value">{{ stats.request_count }}</div>
                 <div class="stat-label">今日请求</div>
             </div>
         </div>
@@ -36,7 +36,7 @@
                 ⚠️
             </div>
             <div class="stat-info">
-                <div class="stat-value">{% raw %}{{ stats.error_rate || 0 }}%{% endraw %}</div>
+                <div class="stat-value">{{ stats.error_rate }}%</div>
                 <div class="stat-label">错误率</div>
             </div>
         </div>
@@ -86,7 +86,5 @@
     </el-card>
 </div>
 
-{% block page_data %}
-stats: {{ stats|tojson }}
-{% endblock %}
+{% block page_data %}stats: {{ stats|tojson }}{% endblock %}
 {% endblock %}

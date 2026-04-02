@@ -397,6 +397,10 @@ body {
 }
 
 /* Animations */
+[v-cloak] {
+    display: none;
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;

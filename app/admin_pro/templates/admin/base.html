@@ -53,9 +53,9 @@
                         </el-dropdown>
                         <div class="user-info" @click="showUserMenu">
                             <div class="user-avatar">
-                                {% raw %}{{ user.username ? user.username.charAt(0).toUpperCase() : 'A' }}{% endraw %}
+                                {{ user.username ? user.username.charAt(0).toUpperCase() : 'A' }}
                             </div>
-                            <span>{% raw %}{{ user.username || 'Guest' }}{% endraw %}</span>
+                            <span>{{ user.username || 'Guest' }}</span>
                             <i class="el-icon-arrow-down"></i>
                         </div>
                         <el-popover 

@@ -26,18 +26,18 @@
             <el-table-column prop="id" label="ID" width="80" sortable></el-table-column>
             <el-table-column prop="username" label="用户名" min-width="150">
                 <template #default="scope">
-                    <strong>{% raw %}{{ scope.row.username }}{% endraw %}</strong>
+                    <strong>{{ scope.row.username }}</strong>
                 </template>
             </el-table-column>
             <el-table-column prop="email" label="邮箱" min-width="200"></el-table-column>
             <el-table-column prop="role" label="角色" width="120">
                 <template #default="scope">
-                    {% raw %}<el-tag :type="scope.row.role==='admin'?'danger':'info'" size="medium">{{ scope.row.role }}</el-tag>{% endraw %}
+                    <el-tag :type="scope.row.role==='admin'?'danger':'info'" size="medium">{{ scope.row.role }}</el-tag>
                 </template>
             </el-table-column>
             <el-table-column prop="is_active" label="状态" width="100">
                 <template #default="scope">
-                    {% raw %}<el-tag :type="scope.row.is_active?'success':'info'" size="medium">{{ scope.row.is_active?'启用':'禁用' }}</el-tag>{% endraw %}
+                    <el-tag :type="scope.row.is_active?'success':'info'" size="medium">{{ scope.row.is_active?'启用':'禁用' }}</el-tag>
                 </template>
             </el-table-column>
             <el-table-column prop="created_at" label="创建时间" width="180"></el-table-column>

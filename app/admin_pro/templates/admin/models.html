@@ -17,7 +17,7 @@
             <el-table-column prop="name" label="模型名称" min-width="200">
                 <template #default="scope">
                     <el-tag type="success" size="medium">
-                        {% raw %}{{ scope.row.name }}{% endraw %}
+                        {{ scope.row.name }}
                     </el-tag>
                 </template>
             </el-table-column>
