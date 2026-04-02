@@ -10,7 +10,7 @@
         </div>
         <el-table :data="data" v-loading="loading">
             <el-table-column v-for="col in columns" :key="col.name" :prop="col.name" :label="col.name" :sortable="col.is_integer||col.is_datetime">
-                <template #default="s"><span v-if="col.is_datetime">{{formatDt(s.row[col.name])}}</span><span v-else>{{s.row[col.name]}}</span></template>
+                <template #default="s">{% raw %}<span v-if="col.is_datetime">{{formatDt(s.row[col.name])}}</span><span v-else>{{s.row[col.name]}}</span>{% endraw %}</template>
             </el-table-column>
             <el-table-column label="操作" width="200" fixed="right"><template #default="s"><el-button size="small" @click="showEdit(s.row)">✏️ 编辑</el-button><el-button size="small" type="danger" @click="handleDelete(s.row)">🗑️ 删除</el-button></template></el-table-column>
         </el-table>

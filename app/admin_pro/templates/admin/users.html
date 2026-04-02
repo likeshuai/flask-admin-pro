@@ -12,7 +12,7 @@
             <el-table-column prop="id" label="ID" width="80"></el-table-column>
             <el-table-column prop="username" label="用户名"></el-table-column>
             <el-table-column prop="email" label="邮箱"></el-table-column>
-            <el-table-column prop="role" label="角色" width="100"><template #default="s"><el-tag :type="s.row.role==='admin'?'danger':'info'" size="small">{{s.row.role}}</el-tag></template></el-table-column>
+            <el-table-column prop="role" label="角色" width="100"><template #default="s">{% raw %}<el-tag :type="s.row.role==='admin'?'danger':'info'" size="small">{{s.row.role}}</el-tag>{% endraw %}</template></el-table-column>
             <el-table-column prop="is_active" label="状态" width="100"><template #default="s"><el-tag :type="s.row.is_active?'success':'info'" size="small">{% raw %}{{s.row.is_active?'启用':'禁用'}}{% endraw %}</el-tag></template></el-table-column>
             <el-table-column label="操作" width="200"><template #default="s"><el-button size="small" @click="showEdit(s.row)">✏️ 编辑</el-button><el-button size="small" type="danger" @click="handleDelete(s.row)">🗑️ 删除</el-button></template></el-table-column>
         </el-table>
