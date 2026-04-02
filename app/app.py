@@ -62,7 +62,7 @@ class Category(db.Model):
 
 
 # Initialize Flask Admin Pro
-admin = AdminPro(app, database_uri='sqlite:///admin.db')
+admin = AdminPro(app, db=db, database_uri='sqlite:///admin.db')
 
 
 @app.route('/')

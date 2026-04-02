@@ -1,102 +1,3 @@
-"""
-Flask Admin Pro - Main Blueprint and initialization.
-"""
-
-import time
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect
-from .models import db, AdminUser, RequestLog
-from .core.auth import AuthManager
-from .core.crud import CRUDManager
-from .core.orm_adapter import ORMAdapter
-from .core.monitor import MonitorManager
-
-# Initialize extensions
-login_manager = LoginManager()
-csrf = CSRFProtect()
-
-
-class AdminPro:
-    """Flask Admin Pro main class."""
-    
-    def __init__(self, app=None, db=None, database_uri=None, **kwargs):
-        self.app = app
-        self.db = db
-        self.database_uri = database_uri
-        self.auth = AuthManager()
-        self.crud = None
-        self.adapter = None
-        self.monitor = None
-        
-        if app is not None:
-            self.init_app(app, db, database_uri, **kwargs)
-    
-    def init_app(self, app, db=None, database_uri=None, **kwargs):
-        self.app = app
-        self.database_uri = database_uri or app.config.get('ADMIN_DATABASE_URI', 'sqlite:///admin.db')
-        
-        app.config.setdefault('SECRET_KEY', 'dev-secret-key-change-in-production')
-        app.config.setdefault('ADMIN_DATABASE_URI', self.database_uri)
-        app.config.setdefault('SQLALCHEMY_TRACK_MODIFICATIONS', False)
-        app.config.setdefault('ADMIN_USERNAME', 'admin')
-        app.config.setdefault('ADMIN_PASSWORD', 'admin123')
-        app.config.setdefault('ADMIN_ENABLE_MONITOR', True)
-        
-        # Always use internal db instance for AdminPro to avoid conflicts
-        from .models import db as internal_db
-        # Create a separate Flask app context for AdminPro if needed
-        self.db = internal_db
-        
-        login_manager.init_app(app)
-        csrf.init_app(app)
-        
-        self.crud = CRUDManager(self.db)
-        self.adapter = ORMAdapter(self.db)
-        self.monitor = MonitorManager(self.db)
-        
-        @login_manager.user_loader
-        def load_user(user_id):
-            return self.db.session.get(AdminUser, int(user_id))
-        
-        admin_bp = Blueprint('admin', __name__, 
-                            url_prefix='/__admin__',
-                            template_folder='templates',
-                            static_folder='static')
-        
-        self._register_routes(admin_bp)
-        csrf.exempt(admin_bp)
-        
-        app.register_blueprint(admin_bp)
-        
-        # Initialize AdminPro database separately
-        with app.app_context():
-            # Configure the internal db with AdminPro's database URI
-            app.config['SQLALCHEMY_DATABASE_URI'] = self.database_uri
-            self.db.init_app(app)
-            self.db.create_all()
-            self._create_default_admin(app)
-            # Restore main app's database URI
-            app.config['SQLALCHEMY_DATABASE_URI'] = app.config.get('MAIN_APP_DATABASE_URI', 'sqlite:///example.db')
-        
-        if app.config.get('ADMIN_ENABLE_MONITOR', True):
-            @app.before_request
-            def before_request():
-                request.start_time = time.time()
-            
-            @app.after_request
-            def after_request(response):
-                if hasattr(request, 'start_time') and request.path.startswith('/__admin__/api/'):
-                    response_time = (time.time() - request.start_time) * 1000
-                    self.monitor.log_request(
-                        method=request.method,
-                        path=request.path,
-                        status_code=response.status_code,
-                        response_time=response_time,
-                        ip_address=request.remote_addr,
-                    )
-                return response
-    
     def _register_routes(self, bp):
         @bp.route('/')
         def index():
@@ -177,7 +78,7 @@ class AdminPro:
             per_page = request.args.get('per_page', 20, type=int)
             search = request.args.get('search', '')
             
-            result = self.crud.get_all(AdminUser, page=page, per_page=per_page, search=search)
+            result = self.crud.get_all(self.AdminUser, page=page, per_page=per_page, search=search)
             return jsonify(result)
         
         @bp.route('/api/users', methods=['POST'])
@@ -190,10 +91,10 @@ class AdminPro:
             if not data.get('username') or not data.get('password'):
                 return jsonify({'error': 'Username and password required'}), 400
             
-            if self.db.session.query(AdminUser).filter_by(username=data['username']).first():
+            if self.db.session.query(self.AdminUser).filter_by(username=data['username']).first():
                 return jsonify({'error': 'Username already exists'}), 400
             
-            user = AdminUser(
+            user = self.AdminUser(
                 username=data['username'],
                 email=data.get('email'),
                 role=data.get('role', 'admin'),
@@ -211,14 +112,14 @@ class AdminPro:
             if not self.auth.is_authenticated():
                 return jsonify({'error': 'Unauthorized'}), 401
             
-            user = self.db.session.get(AdminUser, user_id)
+            user = self.db.session.get(self.AdminUser, user_id)
             if not user:
                 return jsonify({'error': 'User not found'}), 404
             
             data = request.get_json() or {}
             
             if 'username' in data:
-                existing = self.db.session.query(AdminUser).filter_by(username=data['username']).first()
+                existing = self.db.session.query(self.AdminUser).filter_by(username=data['username']).first()
                 if existing and existing.id != user_id:
                     return jsonify({'error': 'Username already exists'}), 400
                 user.username = data['username']
@@ -244,7 +145,7 @@ class AdminPro:
             if not self.auth.is_authenticated():
                 return jsonify({'error': 'Unauthorized'}), 401
             
-            user = self.db.session.get(AdminUser, user_id)
+            user = self.db.session.get(self.AdminUser, user_id)
             if not user:
                 return jsonify({'error': 'User not found'}), 404
             
@@ -368,18 +269,3 @@ class AdminPro:
                                          status_min=status_min)
             
             return jsonify(logs)
-    
-    def _create_default_admin(self, app):
-        username = app.config.get('ADMIN_USERNAME', 'admin')
-        password = app.config.get('ADMIN_PASSWORD', 'admin123')
-        
-        existing = self.db.session.query(AdminUser).filter_by(username=username).first()
-        if not existing:
-            user = AdminUser(
-                username=username,
-                role='admin',
-                is_active=True,
-            )
-            user.set_password(password)
-            self.db.session.add(user)
-            self.db.session.commit()
