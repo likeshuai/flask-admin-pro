@@ -28,7 +28,6 @@ class AdminPro:
     
     def init_app(self, app, db=None, database_uri=None, **kwargs):
         self.app = app
-        self.db = db
         self.database_uri = database_uri or app.config.get('ADMIN_DATABASE_URI', 'sqlite:///admin.db')
         
         app.config.setdefault('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -38,14 +37,10 @@ class AdminPro:
         app.config.setdefault('ADMIN_PASSWORD', 'admin123')
         app.config.setdefault('ADMIN_ENABLE_MONITOR', True)
         
-        # Initialize extensions with the provided db or create internal one
-        if self.db is None:
-            from .models import db as internal_db
-            internal_db.init_app(app)
-            self.db = internal_db
-        else:
-            # Use the provided db instance
-            pass
+        # Always use internal db instance for AdminPro to avoid conflicts
+        from .models import db as internal_db
+        # Create a separate Flask app context for AdminPro if needed
+        self.db = internal_db
         
         login_manager.init_app(app)
         csrf.init_app(app)
@@ -68,9 +63,15 @@ class AdminPro:
         
         app.register_blueprint(admin_bp)
         
+        # Initialize AdminPro database separately
         with app.app_context():
+            # Configure the internal db with AdminPro's database URI
+            app.config['SQLALCHEMY_DATABASE_URI'] = self.database_uri
+            self.db.init_app(app)
             self.db.create_all()
             self._create_default_admin(app)
+            # Restore main app's database URI
+            app.config['SQLALCHEMY_DATABASE_URI'] = app.config.get('MAIN_APP_DATABASE_URI', 'sqlite:///example.db')
         
         if app.config.get('ADMIN_ENABLE_MONITOR', True):
             @app.before_request

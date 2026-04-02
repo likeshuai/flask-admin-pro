@@ -17,6 +17,7 @@ from admin_pro import AdminPro
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///example.db'
+app.config['MAIN_APP_DATABASE_URI'] = 'sqlite:///example.db'  # Save for AdminPro restoration
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
