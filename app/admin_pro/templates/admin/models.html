@@ -4,25 +4,127 @@
 {% block content %}
 <div id="models-app">
     <el-card>
-        <template #header><span>📁 数据模型列表</span></template>
-        <el-table :data="models" v-loading="loading">
-            <el-table-column prop="name" label="模型名称"><template #default="s">{% raw %}<strong>{{s.row.name}}</strong>{% endraw %}</template></el-table-column>
-            <el-table-column prop="table" label="数据表"></el-table-column>
-            <el-table-column label="操作" width="200"><template #default="s"><el-button type="primary" size="small" @click="goTo(s.row.name)">📊 管理数据</el-button></template></el-table-column>
+        <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>📁 数据模型列表</span>
+                <el-button type="primary" size="small" @click="refreshModels">
+                    <i class="el-icon-refresh"></i> 刷新
+                </el-button>
+            </div>
+        </template>
+        
+        <el-table :data="models" v-loading="loading" style="width: 100%;">
+            <el-table-column prop="name" label="模型名称" min-width="200">
+                <template #default="scope">
+                    <el-tag type="success" size="medium">
+                        {% raw %}{{ scope.row.name }}{% endraw %}
+                    </el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column prop="table" label="数据表" min-width="200"></el-table-column>
+            <el-table-column label="记录数" width="120">
+                <template #default="scope">
+                    <el-badge :value="scope.row.record_count || 0" type="primary"></el-badge>
+                </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+                <template #default="scope">
+                    <el-button type="primary" size="small" @click="goToModel(scope.row.name)">
+                        <i class="el-icon-data-analysis"></i> 管理数据
+                    </el-button>
+                </template>
+            </el-table-column>
         </el-table>
-        <el-empty v-if="models.length===0&&!loading" description="暂无数据模型"></el-empty>
+        
+        <el-empty v-if="models.length === 0 && !loading" description="暂无数据模型">
+            <template #image>
+                <i class="el-icon-files" style="font-size: 48px; color: #909399;"></i>
+            </template>
+            <template #description>
+                <p>系统将自动扫描 SQLAlchemy 模型</p>
+            </template>
+        </el-empty>
     </el-card>
-    <el-card style="margin-top:20px;"><template #header><span>💡 使用说明</span></template><div style="color:#666;line-height:1.8;"><p>1. 点击「管理数据」可查看和管理模型数据</p><p>2. 系统自动扫描 SQLAlchemy 模型</p><p>3. 支持搜索、分页、排序等 CRUD 操作</p></div></el-card>
+    
+    <el-card style="margin-top: 24px;">
+        <template #header>
+            <span>💡 使用说明</span>
+        </template>
+        <div style="color: var(--text-secondary); line-height: 1.8;">
+            <el-alert title="自动模型发现" type="info" show-icon style="margin-bottom: 16px;">
+                Flask Admin Pro 会自动扫描应用中的所有 SQLAlchemy 模型，并为每个模型生成完整的 CRUD 界面。
+            </el-alert>
+            
+            <el-alert title="功能特性" type="success" show-icon style="margin-bottom: 16px;">
+                <ul style="padding-left: 20px; margin-top: 8px;">
+                    <li>🔍 智能字段类型识别（字符串、数字、日期等）</li>
+                    <li>📊 支持分页、搜索、排序</li>
+                    <li>⚡ 实时数据操作（增删改查）</li>
+                    <li>📱 完全响应式设计</li>
+                </ul>
+            </el-alert>
+            
+            <el-alert title="注意事项" type="warning" show-icon>
+                <p>确保您的模型继承自 SQLAlchemy 的 Model 类，并且在应用上下文中正确注册。</p>
+            </el-alert>
+        </div>
+    </el-card>
 </div>
+
 <script>
-const{createApp,ref,onMounted}=Vue;
+const { createApp, ref, onMounted } = Vue;
 createApp({
-    setup(){
-        const loading=ref(false),models=ref([]);
-        const loadModels=async()=>{loading.value=true;try{const r=await fetch('/__admin__/api/models');const d=await r.json();models.value=d.models||[];}catch(e){}finally{loading.value=false;}};
-        const goTo=(n)=>location.href=`/__admin__/model/${n}`;
-        onMounted(()=>loadModels());
-        return{loading,models,goTo};
+    setup() {
+        const loading = ref(false);
+        const models = ref([]);
+        
+        const loadModels = async () => {
+            loading.value = true;
+            try {
+                const response = await fetch('/__admin__/api/models');
+                const data = await response.json();
+                
+                // Get record count for each model
+                const modelsWithCount = [];
+                for (const model of data.models || []) {
+                    try {
+                        const countResponse = await fetch(`/__admin__/api/models/${model.name}?page=1&per_page=1`);
+                        const countData = await countResponse.json();
+                        modelsWithCount.push({
+                            ...model,
+                            record_count: countData.total || 0
+                        });
+                    } catch (error) {
+                        modelsWithCount.push({ ...model, record_count: 0 });
+                    }
+                }
+                
+                models.value = modelsWithCount;
+            } catch (error) {
+                ElementPlus.ElMessage.error('加载模型列表失败');
+            } finally {
+                loading.value = false;
+            }
+        };
+        
+        const refreshModels = () => {
+            loadModels();
+        };
+        
+        const goToModel = (modelName) => {
+            window.location.href = `/__admin__/model/${modelName}`;
+        };
+        
+        onMounted(() => {
+            loadModels();
+        });
+        
+        return {
+            loading,
+            models,
+            refreshModels,
+            goToModel
+        };
     }
 }).use(ElementPlus).mount('#models-app');
 </script>

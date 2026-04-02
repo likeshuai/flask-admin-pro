@@ -4,46 +4,277 @@
 {% block content %}
 <div id="crud-app">
     <el-card>
-        <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
-            <div style="display:flex;gap:10px;"><el-input v-model="search" placeholder="搜索..." style="width:200px;" clearable></el-input><el-button @click="loadData">搜索</el-button></div>
-            <el-button type="primary" @click="showCreate">➕ 新增记录</el-button>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 24px; align-items: center;">
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <el-input 
+                    v-model="search" 
+                    placeholder="搜索..." 
+                    style="width: 240px;" 
+                    clearable
+                    prefix-icon="Search"
+                ></el-input>
+                <el-button @click="loadData" type="primary">
+                    <i class="el-icon-search"></i> 搜索
+                </el-button>
+            </div>
+            <el-button type="primary" @click="showCreate" size="large">
+                <i class="el-icon-plus"></i> 新增记录
+            </el-button>
         </div>
-        <el-table :data="data" v-loading="loading">
-            <el-table-column v-for="col in columns" :key="col.name" :prop="col.name" :label="col.name" :sortable="col.is_integer||col.is_datetime">
-                <template #default="s">{% raw %}<span v-if="col.is_datetime">{{formatDt(s.row[col.name])}}</span><span v-else>{{s.row[col.name]}}</span>{% endraw %}</template>
+        
+        <el-table :data="data" v-loading="loading" style="width: 100%;">
+            <el-table-column 
+                v-for="col in columns" 
+                :key="col.name" 
+                :prop="col.name" 
+                :label="col.name" 
+                :sortable="col.is_integer || col.is_datetime"
+                min-width="120"
+            >
+                <template #default="scope">
+                    {% raw %}<span v-if="col.is_datetime">{{ formatDateTime(scope.row[col.name]) }}</span>
+                    <span v-else-if="col.is_boolean">{{ scope.row[col.name] ? '✅' : '❌' }}</span>
+                    <span v-else>{{ scope.row[col.name] }}</span>{% endraw %}
+                </template>
             </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right"><template #default="s"><el-button size="small" @click="showEdit(s.row)">✏️ 编辑</el-button><el-button size="small" type="danger" @click="handleDelete(s.row)">🗑️ 删除</el-button></template></el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+                <template #default="scope">
+                    <el-button size="small" @click="showEdit(scope.row)" type="primary">
+                        <i class="el-icon-edit"></i> 编辑
+                    </el-button>
+                    <el-button size="small" type="danger" @click="handleDelete(scope.row)">
+                        <i class="el-icon-delete"></i> 删除
+                    </el-button>
+                </template>
+            </el-table-column>
         </el-table>
-        <div style="margin-top:20px;display:flex;justify-content:flex-end;"><el-pagination v-model:current-page="page" v-model:page-size="perPage" :page-sizes="[10,20,50]" :total="total" layout="total,sizes,prev,pager,next" @size-change="loadData" @current-change="loadData"></el-pagination></div>
+        
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+            <el-pagination
+                v-model:current-page="page"
+                v-model:page-size="perPage"
+                :page-sizes="[10, 20, 50, 100]"
+                :total="total"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="loadData"
+                @current-change="loadData"
+            ></el-pagination>
+        </div>
     </el-card>
-    <el-dialog v-model="dialogVisible" :title="isEdit?'编辑记录':'新增记录'" width="600px">
-        <el-form :model="form" label-width="120px">
-            <el-form-item v-for="col in columns" :key="col.name" :label="col.name" :required="!col.nullable&&!col.primary_key">
-                <el-input v-if="col.is_string&&!col.is_datetime" v-model="form[col.name]"></el-input>
-                <el-input-number v-else-if="col.is_integer" v-model="form[col.name]" style="width:100%;"></el-input-number>
-                <el-input v-else v-model="form[col.name]"></el-input>
+    
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑记录' : '新增记录'" width="600px">
+        <el-form :model="form" ref="formRef" label-width="150px">
+            <el-form-item 
+                v-for="col in columns" 
+                :key="col.name" 
+                :label="col.name"
+                :required="!col.nullable && !col.primary_key"
+            >
+                <el-input 
+                    v-if="col.is_string && !col.is_datetime" 
+                    v-model="form[col.name]"
+                    :placeholder="`请输入${col.name}`"
+                ></el-input>
+                <el-date-picker
+                    v-else-if="col.is_datetime"
+                    v-model="form[col.name]"
+                    type="datetime"
+                    format="YYYY-MM-DD HH:mm:ss"
+                    value-format="YYYY-MM-DDTHH:mm:ss"
+                    :placeholder="`请选择${col.name}`"
+                    style="width: 100%;"
+                ></el-date-picker>
+                <el-input-number
+                    v-else-if="col.is_integer"
+                    v-model="form[col.name]"
+                    :min="col.is_primary_key ? 1 : undefined"
+                    controls-position="right"
+                    style="width: 100%;"
+                ></el-input-number>
+                <el-switch
+                    v-else-if="col.is_boolean"
+                    v-model="form[col.name]"
+                ></el-switch>
+                <el-input
+                    v-else
+                    v-model="form[col.name]"
+                    :placeholder="`请输入${col.name}`"
+                ></el-input>
             </el-form-item>
         </el-form>
-        <template #footer><el-button @click="dialogVisible=false">取消</el-button><el-button type="primary" @click="submit" :loading="submitting">确定</el-button></template>
+        <template #footer>
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="submit" :loading="submitting">确定</el-button>
+        </template>
     </el-dialog>
 </div>
+
 <script>
-const{createApp,ref,reactive,onMounted}=Vue;
-const modelName="{{ model_name }}";
-const modelInfo={{ model_info|tojson if model_info else '{}' }};
+const { createApp, ref, reactive, onMounted } = Vue;
+const modelName = "{{ model_name }}";
+const modelInfo = {{ model_info|tojson if model_info else '{}' }};
+
 createApp({
-    setup(){
-        const loading=ref(false),submitting=ref(false),data=ref([]),columns=ref(modelInfo.columns||[]),page=ref(1),perPage=ref(20),total=ref(0),search=ref('');
-        const dialogVisible=ref(false),isEdit=ref(false),editing=ref(null),form=reactive({});
-        const formatDt=(v)=>{if(!v)return'';try{return new Date(v).toLocaleString('zh-CN');}catch{return v;}};
-        const loadData=async()=>{loading.value=true;try{const r=await fetch(`/__admin__/api/models/${modelName}?page=${page.value}&per_page=${perPage.value}&search=${search.value}&sort_by=id&sort_order=desc`);const d=await r.json();data.value=d.data||[];total.value=d.total||0;if(d.columns)columns.value=d.columns;}catch(e){}finally{loading.value=false;}};
-        const resetForm=()=>columns.value.forEach(c=>form[c.name]='');
-        const showCreate=()=>{isEdit.value=false;resetForm();dialogVisible.value=true;};
-        const showEdit=(r)=>{isEdit.value=true;editing.value=r;columns.value.forEach(c=>form[c.name]=r[c.name]!==null?r[c.name]:'');dialogVisible.value=true;};
-        const submit=async()=>{submitting.value=true;try{const d={};columns.value.forEach(c=>{if(form[c.name]!==''&&form[c.name]!==null)d[c.name]=form[c.name];});const r=await fetch(isEdit.value?`/__admin__/api/models/${modelName}/${editing.value.id}`:`/__admin__/api/models/${modelName}`,{method:isEdit.value?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});const res=await r.json();if(res.success){ElementPlus.ElMessage.success('操作成功');dialogVisible.value=false;loadData();}else ElementPlus.ElMessage.error(res.error);}catch(e){}finally{submitting.value=false;}};
-        const handleDelete=async(r)=>{await ElementPlus.ElMessageBox.confirm('确定删除？');try{const res=await fetch(`/__admin__/api/models/${modelName}/${r.id}`,{method:'DELETE'});const d=await res.json();if(d.success){ElementPlus.ElMessage.success('删除成功');loadData();}}catch(e){}};
-        onMounted(()=>loadData());
-        return{loading,submitting,data,columns,page,perPage,total,search,dialogVisible,isEdit,form,formatDt,loadData,showCreate,showEdit,submit,handleDelete};
+    setup() {
+        const loading = ref(false);
+        const submitting = ref(false);
+        const data = ref([]);
+        const columns = ref(modelInfo.columns || []);
+        const page = ref(1);
+        const perPage = ref(20);
+        const total = ref(0);
+        const search = ref('');
+        const dialogVisible = ref(false);
+        const isEdit = ref(false);
+        const editingRecord = ref(null);
+        const formRef = ref(null);
+        
+        const form = reactive({});
+        
+        // Initialize form with empty values
+        const resetForm = () => {
+            columns.value.forEach(col => {
+                if (col.primary_key) {
+                    form[col.name] = null;
+                } else if (col.is_boolean) {
+                    form[col.name] = false;
+                } else {
+                    form[col.name] = '';
+                }
+            });
+        };
+        
+        const formatDateTime = (value) => {
+            if (!value) return '';
+            try {
+                return new Date(value).toLocaleString('zh-CN');
+            } catch (error) {
+                return value;
+            }
+        };
+        
+        const loadData = async () => {
+            loading.value = true;
+            try {
+                const response = await fetch(
+                    `/__admin__/api/models/${modelName}?page=${page.value}&per_page=${perPage.value}&search=${search.value}&sort_by=id&sort_order=desc`
+                );
+                const result = await response.json();
+                data.value = result.data || [];
+                total.value = result.total || 0;
+                if (result.columns) {
+                    columns.value = result.columns;
+                }
+            } catch (error) {
+                ElementPlus.ElMessage.error('加载数据失败');
+            } finally {
+                loading.value = false;
+            }
+        };
+        
+        const showCreate = () => {
+            isEdit.value = false;
+            editingRecord.value = null;
+            resetForm();
+            dialogVisible.value = true;
+        };
+        
+        const showEdit = (record) => {
+            isEdit.value = true;
+            editingRecord.value = record;
+            columns.value.forEach(col => {
+                form[col.name] = record[col.name] !== null && record[col.name] !== undefined ? record[col.name] : '';
+            });
+            dialogVisible.value = true;
+        };
+        
+        const submit = async () => {
+            submitting.value = true;
+            try {
+                const formData = {};
+                columns.value.forEach(col => {
+                    if (form[col.name] !== '' && form[col.name] !== null && form[col.name] !== undefined) {
+                        formData[col.name] = form[col.name];
+                    }
+                });
+                
+                const response = await fetch(
+                    isEdit.value ? `/__admin__/api/models/${modelName}/${editingRecord.value.id}` : `/__admin__/api/models/${modelName}`,
+                    {
+                        method: isEdit.value ? 'PUT' : 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    }
+                );
+                
+                const result = await response.json();
+                if (result.success) {
+                    ElementPlus.ElMessage.success(isEdit.value ? '记录更新成功' : '记录创建成功');
+                    dialogVisible.value = false;
+                    loadData();
+                } else {
+                    ElementPlus.ElMessage.error(result.error || '操作失败');
+                }
+            } catch (error) {
+                ElementPlus.ElMessage.error('网络错误');
+            } finally {
+                submitting.value = false;
+            }
+        };
+        
+        const handleDelete = async (record) => {
+            try {
+                await ElementPlus.ElMessageBox.confirm(
+                    `确定要删除这条记录吗？此操作不可恢复。`,
+                    '确认删除',
+                    {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }
+                );
+                
+                const response = await fetch(`/__admin__/api/models/${modelName}/${record.id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    ElementPlus.ElMessage.success('记录删除成功');
+                    loadData();
+                } else {
+                    ElementPlus.ElMessage.error(result.error || '删除失败');
+                }
+            } catch (error) {
+                // User cancelled
+            }
+        };
+        
+        onMounted(() => {
+            resetForm();
+            loadData();
+        });
+        
+        return {
+            loading,
+            submitting,
+            data,
+            columns,
+            page,
+            perPage,
+            total,
+            search,
+            dialogVisible,
+            isEdit,
+            formRef,
+            form,
+            formatDateTime,
+            loadData,
+            showCreate,
+            showEdit,
+            submit,
+            handleDelete
+        };
     }
 }).use(ElementPlus).mount('#crud-app');
 </script>

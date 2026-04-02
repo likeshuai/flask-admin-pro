@@ -23,7 +23,7 @@ class AdminPro:
         self.app = app
         self.db = db
         self.database_uri = database_uri
-        self.auth = AuthManager()
+        self.auth = None
         self.crud = None
         self.adapter = None
         self.monitor = None
@@ -36,7 +36,7 @@ class AdminPro:
         self.db = db
         self.database_uri = database_uri or 'sqlite:///admin.db'
         
-        # Configure separate database for AdminPro
+        # Configure AdminPro settings
         app.config.setdefault('ADMIN_DATABASE_URI', self.database_uri)
         app.config.setdefault('ADMIN_USERNAME', 'admin')
         app.config.setdefault('ADMIN_PASSWORD', 'admin123')
@@ -70,7 +70,7 @@ class AdminPro:
         
         app.register_blueprint(admin_bp)
         
-        # Create tables in the main database (since we're sharing the db instance)
+        # Create tables and default admin
         with app.app_context():
             db.create_all()
             self._create_default_admin(app)
@@ -157,6 +157,7 @@ class AdminPro:
                 stats = {}
             return render_template('admin/monitor.html', user=self.auth.get_current_user(), stats=stats)
         
+        # API Routes
         @bp.route('/api/login', methods=['POST'])
         def api_login():
             data = request.get_json() or {}
@@ -333,7 +334,7 @@ class AdminPro:
             if not model:
                 return jsonify({'error': 'Model not found'}), 404
             
-            instance = model.query.get(record_id)
+            instance = self.db.session.get(model, record_id)
             if not instance:
                 return jsonify({'error': 'Record not found'}), 404
             
@@ -351,7 +352,7 @@ class AdminPro:
             if not model:
                 return jsonify({'error': 'Model not found'}), 404
             
-            instance = model.query.get(record_id)
+            instance = self.db.session.get(model, record_id)
             if not instance:
                 return jsonify({'error': 'Record not found'}), 404
             

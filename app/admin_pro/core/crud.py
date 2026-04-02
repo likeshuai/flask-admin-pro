@@ -13,7 +13,7 @@ class CRUDManager:
         self.db = db
     
     def get_all(self, model, page=1, per_page=20, search=None, sort_by=None, sort_order='asc'):
-        query = model.query
+        query = self.db.session.query(model)
         
         if search:
             search_filters = []
@@ -43,16 +43,17 @@ class CRUDManager:
         }
     
     def get_by_id(self, model, id):
-        return model.query.get(id)
+        return self.db.session.get(model, id)
     
     def create(self, model, data):
         valid_data = {}
         for col in model.__table__.columns:
             if col.name in data and not col.primary_key:
                 value = data[col.name]
-                if 'datetime' in str(col.type) and value:
+                if 'datetime' in str(col.type).lower() and value:
                     try:
-                        value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        if isinstance(value, str):
+                            value = datetime.fromisoformat(value.replace('Z', '+00:00'))
                     except (ValueError, AttributeError):
                         pass
                 valid_data[col.name] = value
@@ -68,9 +69,10 @@ class CRUDManager:
         for col in model.__table__.columns:
             if col.name in data and not col.primary_key:
                 value = data[col.name]
-                if 'datetime' in str(col.type) and value:
+                if 'datetime' in str(col.type).lower() and value:
                     try:
-                        value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        if isinstance(value, str):
+                            value = datetime.fromisoformat(value.replace('Z', '+00:00'))
                     except (ValueError, AttributeError):
                         pass
                 setattr(instance, col.name, value)

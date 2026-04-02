@@ -17,7 +17,6 @@ from admin_pro import AdminPro
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///example.db'
-app.config['MAIN_APP_DATABASE_URI'] = 'sqlite:///example.db'  # Save for AdminPro restoration
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -69,9 +68,11 @@ admin = AdminPro(app, db=db, database_uri='sqlite:///admin.db')
 def index():
     return """
     <h1>Flask Admin Pro Example</h1>
-    <p>Welcome!</p>
+    <p>Welcome to the professional admin panel!</p>
     <ul>
         <li><a href="/__admin__/">Admin Dashboard</a></li>
+        <li><a href="/api/users">API: Users</a></li>
+        <li><a href="/api/posts">API: Posts</a></li>
     </ul>
     """
 
@@ -83,27 +84,31 @@ def get_users():
 
 
 def create_sample_data():
+    """Create sample data for demonstration."""
     if User.query.count() == 0:
         users = [
             User(username='alice', email='alice@example.com'),
             User(username='bob', email='bob@example.com'),
+            User(username='charlie', email='charlie@example.com'),
         ]
         db.session.add_all(users)
         
         posts = [
-            Post(title='Hello World', content='First post!', author_id=1, is_published=True),
-            Post(title='Python Tips', content='Python tips...', author_id=1, is_published=True),
+            Post(title='Hello World', content='This is my first post!', author_id=1, is_published=True),
+            Post(title='Python Tips', content='Here are some Python tips...', author_id=1, is_published=True),
+            Post(title='Flask Tutorial', content='Learn Flask in 10 minutes', author_id=2, is_published=False),
         ]
         db.session.add_all(posts)
         
         categories = [
-            Category(name='Technology', description='Tech posts'),
-            Category(name='Life', description='Daily life'),
+            Category(name='Technology', description='Tech related posts'),
+            Category(name='Life', description='Daily life sharing'),
+            Category(name='Tutorial', description='How-to guides'),
         ]
         db.session.add_all(categories)
         
         db.session.commit()
-        print("Sample data created!")
+        print("✅ Sample data created!")
 
 
 if __name__ == '__main__':
@@ -111,12 +116,18 @@ if __name__ == '__main__':
         db.create_all()
         create_sample_data()
     
-    print("\n" + "="*50)
-    print("Flask Admin Pro Example Application")
-    print("="*50)
+    print("\n" + "="*60)
+    print("🚀 Flask Admin Pro Professional Edition")
+    print("="*60)
     print("\n🌐 Application URL: http://localhost:5000/")
     print("🔐 Admin Panel URL: http://localhost:5000/__admin__/")
     print("👤 Default Credentials: admin / admin123")
+    print("\n✨ Features:")
+    print("   • Modern UI with Element Plus + Vue 3")
+    print("   • Automatic CRUD for SQLAlchemy models")  
+    print("   • Real-time monitoring and analytics")
+    print("   • Multi-theme support with dark mode")
+    print("   • Responsive design for all devices")
     print("\nPress Ctrl+C to stop the server.\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -14,14 +14,17 @@ class ORMAdapter:
     def get_models(self):
         if self.db is None:
             return []
-        return list(self.db.Model._decl_class_registry.values())
+        # Get all models from the SQLAlchemy registry
+        models = []
+        for model_class in self.db.Model._decl_class_registry.values():
+            if hasattr(model_class, '__tablename__') and not model_class.__name__.startswith('_'):
+                models.append(model_class)
+        return models
     
     def get_model_by_name(self, name):
         models = self.get_models()
         for model in models:
             if hasattr(model, '__name__') and model.__name__ == name:
-                if name.startswith('_'):
-                    continue
                 return model
         return None
     
@@ -39,6 +42,7 @@ class ORMAdapter:
                 'is_datetime': 'datetime' in str(col.type).lower(),
                 'is_integer': 'int' in str(col.type).lower(),
                 'is_string': 'string' in str(col.type).lower() or 'text' in str(col.type).lower(),
+                'is_boolean': 'bool' in str(col.type).lower(),
             }
             columns.append(col_info)
         

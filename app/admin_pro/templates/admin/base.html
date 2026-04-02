@@ -6,62 +6,136 @@
     <title>{% block title %}Flask Admin Pro{% endblock %}</title>
     <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
     <link rel="stylesheet" href="{{ url_for('admin.static', filename='admin/css/style.css') }}">
-    <style>
-        :root { --theme-color: #409EFF; --bg-color: #f5f7fa; --text-color: #303133; }
-        .theme-blue { --theme-color: #409EFF; }
-        .theme-purple { --theme-color: #9333EA; }
-        .theme-green { --theme-color: #22C55E; }
-        .theme-orange { --theme-color: #F97316; }
-        .theme-red { --theme-color: #EF4444; }
-        .dark-mode { --bg-color: #1a1a2e; --text-color: #e4e7ed; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); color: var(--text-color); }
-        .admin-layout { display: flex; min-height: 100vh; }
-        .sidebar { width: 220px; background: #001529; color: #fff; position: fixed; height: 100vh; overflow-y: auto; }
-        .sidebar .logo { padding: 20px; font-size: 18px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--theme-color); }
-        .sidebar-menu { list-style: none; padding: 10px 0; }
-        .sidebar-menu li a { display: block; padding: 12px 20px; color: rgba(255,255,255,0.65); text-decoration: none; }
-        .sidebar-menu li a:hover, .sidebar-menu li a.active { color: #fff; background: var(--theme-color); }
-        .main-content { flex: 1; margin-left: 220px; display: flex; flex-direction: column; }
-        .header { background: #fff; padding: 0 20px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-        .header-right { display: flex; align-items: center; gap: 15px; }
-        .content { padding: 20px; flex: 1; }
-        .el-card { margin-bottom: 20px; }
-        @media (max-width: 768px) { .sidebar { width: 60px; } .sidebar .logo span, .sidebar-menu li a span { display: none; } .main-content { margin-left: 60px; } }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div id="app">
         <div class="admin-layout">
             <aside class="sidebar">
-                <div class="logo"><span>🤖 Flask Admin</span></div>
+                <div class="logo">
+                    <div class="logo-icon">🤖</div>
+                    <span>Flask Admin Pro</span>
+                </div>
                 <ul class="sidebar-menu">
-                    <li><a href="{{ url_for('admin.index') }}"><span>📊 仪表盘</span></a></li>
-                    <li><a href="{{ url_for('admin.users') }}"><span>👥 用户管理</span></a></li>
-                    <li><a href="{{ url_for('admin.models') }}"><span>📁 模型管理</span></a></li>
-                    <li><a href="{{ url_for('admin.monitor') }}"><span>📈 监控中心</span></a></li>
+                    <li><a href="{{ url_for('admin.index') }}" :class="{active: currentRoute === '/'}"><i>📊</i> <span>仪表盘</span></a></li>
+                    <li><a href="{{ url_for('admin.users') }}" :class="{active: currentRoute === '/users'}"><i>👥</i> <span>用户管理</span></a></li>
+                    <li><a href="{{ url_for('admin.models') }}" :class="{active: currentRoute === '/models'}"><i>📁</i> <span>模型管理</span></a></li>
+                    <li><a href="{{ url_for('admin.monitor') }}" :class="{active: currentRoute === '/monitor'}"><i>📈</i> <span>监控中心</span></a></li>
                 </ul>
             </aside>
             <div class="main-content">
                 <header class="header">
-                    <div class="header-left"><el-breadcrumb separator="/"><el-breadcrumb-item>首页</el-breadcrumb-item><el-breadcrumb-item>{% block breadcrumb %}仪表盘{% endblock %}</el-breadcrumb-item></el-breadcrumb></div>
+                    <div class="header-breadcrumb">
+                        <el-breadcrumb separator="/">
+                            <el-breadcrumb-item>首页</el-breadcrumb-item>
+                            <el-breadcrumb-item>{% block breadcrumb %}仪表盘{% endblock %}</el-breadcrumb-item>
+                        </el-breadcrumb>
+                    </div>
                     <div class="header-right">
-                        <el-dropdown @command="handleTheme"><span class="el-dropdown-link">🎨 主题 <el-icon><arrow-down /></el-icon></span><template #dropdown><el-dropdown-menu><el-dropdown-item command="blue">🔵 蓝色</el-dropdown-item><el-dropdown-item command="purple">🟣 紫色</el-dropdown-item><el-dropdown-item command="green">🟢 绿色</el-dropdown-item><el-dropdown-item command="orange">🟠 橙色</el-dropdown-item><el-dropdown-item command="red">🔴 红色</el-dropdown-item><el-dropdown-item divided command="dark">🌙 黑夜模式</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
-                        <el-dropdown @command="handleUserCommand"><span class="el-dropdown-link">👤 {{ user.username if user else 'Guest' }} <el-icon><arrow-down /></el-icon></span><template #dropdown><el-dropdown-menu><el-dropdown-item command="logout">🚪 退出登录</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
+                        <el-dropdown @command="handleThemeChange">
+                            <span class="el-dropdown-link">
+                                <i class="el-icon-sunny"></i>
+                                <span>主题</span>
+                                <i class="el-icon-arrow-down el-icon--right"></i>
+                            </span>
+                            <template #dropdown>
+                                <el-dropdown-menu>
+                                    <el-dropdown-item command="light-blue">🔵 浅蓝主题</el-dropdown-item>
+                                    <el-dropdown-item command="dark-blue">🟣 深蓝主题</el-dropdown-item>
+                                    <el-dropdown-item command="green">🟢 绿色主题</el-dropdown-item>
+                                    <el-dropdown-item command="purple">🟣 紫色主题</el-dropdown-item>
+                                    <el-dropdown-item command="orange">🟠 橙色主题</el-dropdown-item>
+                                    <el-dropdown-item divided command="dark">🌙 黑夜模式</el-dropdown-item>
+                                </el-dropdown-menu>
+                            </template>
+                        </el-dropdown>
+                        <div class="user-info" @click="showUserMenu">
+                            <div class="user-avatar">
+                                {% raw %}{{ user.username ? user.username.charAt(0).toUpperCase() : 'A' }}{% endraw %}
+                            </div>
+                            <span>{% raw %}{{ user.username || 'Guest' }}{% endraw %}</span>
+                            <i class="el-icon-arrow-down"></i>
+                        </div>
+                        <el-popover 
+                            ref="userMenuRef"
+                            placement="bottom-end"
+                            width="200"
+                            trigger="click"
+                            :visible="userMenuVisible"
+                            @hide="userMenuVisible = false"
+                        >
+                            <template #reference>
+                                <div style="display: none;"></div>
+                            </template>
+                            <div style="padding: 12px 0;">
+                                <el-button 
+                                    plain 
+                                    size="small" 
+                                    style="width: 100%; margin-bottom: 8px;"
+                                    @click="logout"
+                                >
+                                    🚪 退出登录
+                                </el-button>
+                            </div>
+                        </el-popover>
                     </div>
                 </header>
-                <main class="content">{% block content %}{% endblock %}</main>
+                <main class="content">
+                    {% block content %}{% endblock %}
+                </main>
             </div>
         </div>
     </div>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/element-plus"></script>
-    <script src="{{ url_for('admin.static', filename='admin/js/app.js') }}"></script>
-    {% block extra_js %}{% endblock %}
     <script>
-        function handleTheme(cmd) { if(cmd==='dark') document.body.classList.toggle('dark-mode'); else { document.body.className=''; document.body.classList.add('theme-'+cmd); } localStorage.setItem('admin-theme',cmd); }
-        function handleUserCommand(cmd) { if(cmd==='logout') fetch('/__admin__/api/logout',{method:'POST'}).then(()=>location.href='/__admin__/login'); }
+        const { createApp, ref, reactive, onMounted } = Vue;
+        createApp({
+            setup() {
+                const currentRoute = ref(window.location.pathname.replace('/__admin__', '') || '/');
+                const userMenuVisible = ref(false);
+                const user = reactive({ username: '{{ user.username if user else "" }}' });
+                
+                const showUserMenu = () => {
+                    userMenuVisible.value = !userMenuVisible.value;
+                };
+                
+                const logout = async () => {
+                    try {
+                        await fetch('/__admin__/api/logout', { method: 'POST' });
+                        window.location.href = '/__admin__/login';
+                    } catch (e) {
+                        ElementPlus.ElMessage.error('退出失败');
+                    }
+                };
+                
+                const handleThemeChange = (theme) => {
+                    document.documentElement.setAttribute('data-theme', theme);
+                    localStorage.setItem('admin-theme', theme);
+                    ElementPlus.ElMessage.success('主题已切换');
+                };
+                
+                // Load saved theme
+                onMounted(() => {
+                    const savedTheme = localStorage.getItem('admin-theme');
+                    if (savedTheme) {
+                        document.documentElement.setAttribute('data-theme', savedTheme);
+                    }
+                });
+                
+                return {
+                    currentRoute,
+                    userMenuVisible,
+                    user,
+                    showUserMenu,
+                    logout,
+                    handleThemeChange
+                };
+            }
+        }).use(ElementPlus).mount('#app');
     </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
