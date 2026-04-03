@@ -24,6 +24,12 @@ const routes = [
         meta: { title: '数据模型', icon: 'Collection' }
       },
       {
+        path: 'models/:modelName',
+        name: 'ModelCrud',
+        component: () => import('@/views/ModelCrud.vue'),
+        meta: { title: '数据管理', icon: 'Collection', hidden: true }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('@/views/Users.vue'),

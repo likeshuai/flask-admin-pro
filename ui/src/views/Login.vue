@@ -86,14 +86,21 @@ const handleLogin = async () => {
     
     const res = await login(loginForm)
     
-    if (res.token) {
-      localStorage.setItem('admin_token', res.token)
+    // 后端返回 { success: true, user: {...} }
+    if (res.success) {
+      // 使用session认证，设置一个标识表示已登录
+      localStorage.setItem('admin_token', 'authenticated')
+      localStorage.setItem('admin_user', JSON.stringify(res.user))
       ElMessage.success('登录成功')
       router.push('/')
+    } else {
+      ElMessage.error(res.error || '登录失败')
     }
   } catch (error) {
     if (error.response?.status === 401) {
       ElMessage.error('用户名或密码错误')
+    } else {
+      ElMessage.error('登录失败，请检查网络连接')
     }
   } finally {
     loading.value = false

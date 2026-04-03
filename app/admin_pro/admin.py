@@ -3,6 +3,7 @@ Flask Admin Pro - Main Blueprint and initialization.
 """
 
 import time
+import json
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -41,12 +42,16 @@ class AdminPro:
         app.config.setdefault('ADMIN_USERNAME', 'admin')
         app.config.setdefault('ADMIN_PASSWORD', 'admin123')
         app.config.setdefault('ADMIN_ENABLE_MONITOR', True)
+        app.config.setdefault('ADMIN_LOG_REQUEST_BODY', True)
+        app.config.setdefault('ADMIN_LOG_RESPONSE_BODY', True)
         
         # Create models using the provided db instance
         from .models import create_admin_models
-        AdminUser, RequestLog = create_admin_models(db)
+        AdminUser, RequestLog, AuditLog, SystemConfig = create_admin_models(db)
         self.AdminUser = AdminUser
         self.RequestLog = RequestLog
+        self.AuditLog = AuditLog
+        self.SystemConfig = SystemConfig
         
         login_manager.init_app(app)
         csrf.init_app(app)
@@ -74,30 +79,76 @@ class AdminPro:
         with app.app_context():
             db.create_all()
             self._create_default_admin(app)
+            self._create_default_configs()
         
         if app.config.get('ADMIN_ENABLE_MONITOR', True):
             @app.before_request
             def before_request():
                 request.start_time = time.time()
+                # Store request body for logging
+                if app.config.get('ADMIN_LOG_REQUEST_BODY', True):
+                    try:
+                        request._admin_body = request.get_data(as_text=True)[:10000]
+                    except Exception:
+                        request._admin_body = None
             
             @app.after_request
             def after_request(response):
-                if hasattr(request, 'start_time') and request.path.startswith('/__admin__/api/'):
+                # Exclude Admin backend requests
+                if hasattr(request, 'start_time') and not request.path.startswith('/__admin__'):
                     response_time = (time.time() - request.start_time) * 1000
+                    
+                    # Get response body if configured
+                    response_body = None
+                    if app.config.get('ADMIN_LOG_RESPONSE_BODY', True):
+                        try:
+                            if response.content_type and 'json' in response.content_type:
+                                response_body = response.get_data(as_text=True)[:10000]
+                        except Exception:
+                            pass
+                    
+                    # Get request headers
+                    headers_dict = {}
+                    for key, value in request.headers:
+                        if key.lower() not in ['cookie', 'authorization']:
+                            headers_dict[key] = value
+                    
                     self.monitor.log_request(
                         method=request.method,
                         path=request.path,
                         status_code=response.status_code,
                         response_time=response_time,
                         ip_address=request.remote_addr,
+                        user_agent=request.headers.get('User-Agent', '')[:500],
+                        request_headers=json.dumps(headers_dict)[:2000] if headers_dict else None,
+                        request_body=getattr(request, '_admin_body', None),
+                        response_body=response_body,
                     )
                 return response
+    
+    def _log_audit(self, action, resource_type=None, resource_id=None, old_value=None, new_value=None):
+        """Log an audit event."""
+        try:
+            user = self.auth.get_current_user()
+            log = self.AuditLog(
+                user_id=user.id if user else None,
+                username=user.username if user else 'System',
+                action=action,
+                resource_type=resource_type,
+                resource_id=str(resource_id) if resource_id else None,
+                old_value=json.dumps(old_value) if old_value else None,
+                new_value=json.dumps(new_value) if new_value else None,
+                ip_address=request.remote_addr,
+            )
+            self.db.session.add(log)
+            self.db.session.commit()
+        except Exception as e:
+            print(f"[AdminPro] Audit log error: {e}")
     
     def _register_routes(self, bp):
         @bp.route('/')
         def index():
             if self.auth.is_authenticated():
-                # Get stats for dashboard
                 try:
                     users_response = self.db.session.query(self.AdminUser).count()
                     models_response = len(self.adapter.get_models())
@@ -150,12 +201,32 @@ class AdminPro:
         def monitor():
             if not self.auth.is_authenticated():
                 return redirect(url_for('admin.login'))
-            # Get stats for monitor page
             try:
                 stats = self.monitor.get_stats(range_hours=24)
             except Exception:
                 stats = {}
             return render_template('admin/monitor.html', user=self.auth.get_current_user(), stats=stats)
+        
+        @bp.route('/monitor/<int:log_id>')
+        def monitor_detail(log_id):
+            if not self.auth.is_authenticated():
+                return redirect(url_for('admin.login'))
+            log = self.db.session.get(self.RequestLog, log_id)
+            if not log:
+                return redirect(url_for('admin.monitor'))
+            return render_template('admin/monitor_detail.html', user=self.auth.get_current_user(), log=log)
+        
+        @bp.route('/audit-logs')
+        def audit_logs():
+            if not self.auth.is_authenticated():
+                return redirect(url_for('admin.login'))
+            return render_template('admin/audit_logs.html', user=self.auth.get_current_user())
+        
+        @bp.route('/system-config')
+        def system_config():
+            if not self.auth.is_authenticated():
+                return redirect(url_for('admin.login'))
+            return render_template('admin/system_config.html', user=self.auth.get_current_user())
         
         # API Routes
         @bp.route('/api/login', methods=['POST'])
@@ -170,12 +241,16 @@ class AdminPro:
             user = self.auth.authenticate(username, password)
             if user:
                 self.auth.login(user, remember=True)
+                self._log_audit('LOGIN', 'User', user.id)
                 return jsonify({'success': True, 'user': user.to_dict()})
             
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
         
         @bp.route('/api/logout', methods=['POST'])
         def api_logout():
+            user = self.auth.get_current_user()
+            if user:
+                self._log_audit('LOGOUT', 'User', user.id)
             self.auth.logout()
             return jsonify({'success': True})
         
@@ -189,12 +264,14 @@ class AdminPro:
         def api_get_users():
             if not self.auth.is_authenticated():
                 return jsonify({'error': 'Unauthorized'}), 401
-            
+
             page = request.args.get('page', 1, type=int)
             per_page = request.args.get('per_page', 20, type=int)
             search = request.args.get('search', '')
-            
+
             result = self.crud.get_all(self.AdminUser, page=page, per_page=per_page, search=search)
+            # Rename 'data' to 'items' for consistency with other APIs
+            result['items'] = result.pop('data', [])
             return jsonify(result)
         
         @bp.route('/api/users', methods=['POST'])
@@ -221,6 +298,8 @@ class AdminPro:
             self.db.session.add(user)
             self.db.session.commit()
             
+            self._log_audit('CREATE', 'User', user.id, new_value=user.to_dict())
+            
             return jsonify({'success': True, 'user': user.to_dict()}), 201
         
         @bp.route('/api/users/<int:user_id>', methods=['PUT'])
@@ -232,6 +311,7 @@ class AdminPro:
             if not user:
                 return jsonify({'error': 'User not found'}), 404
             
+            old_value = user.to_dict()
             data = request.get_json() or {}
             
             if 'username' in data:
@@ -254,6 +334,8 @@ class AdminPro:
             
             self.db.session.commit()
             
+            self._log_audit('UPDATE', 'User', user.id, old_value=old_value, new_value=user.to_dict())
+            
             return jsonify({'success': True, 'user': user.to_dict()})
         
         @bp.route('/api/users/<int:user_id>', methods=['DELETE'])
@@ -268,8 +350,11 @@ class AdminPro:
             if self.auth.get_current_user().id == user_id:
                 return jsonify({'error': 'Cannot delete yourself'}), 400
             
+            old_value = user.to_dict()
             self.db.session.delete(user)
             self.db.session.commit()
+            
+            self._log_audit('DELETE', 'User', user_id, old_value=old_value)
             
             return jsonify({'success': True})
         
@@ -305,14 +390,17 @@ class AdminPro:
             sort_by = request.args.get('sort_by', 'id')
             sort_order = request.args.get('sort_order', 'desc')
             
-            result = self.crud.get_all(model, page=page, per_page=per_page, 
+            result = self.crud.get_all(model, page=page, per_page=per_page,
                                        search=search, sort_by=sort_by, sort_order=sort_order)
             model_info = self.adapter.get_model_info(model)
             if model_info:
                 result['columns'] = model_info['columns']
             else:
                 result['columns'] = []
-            
+
+            # Rename 'data' to 'items' for consistency
+            result['items'] = result.pop('data', [])
+
             return jsonify(result)
         
         @bp.route('/api/models/<model_name>', methods=['POST'])
@@ -327,7 +415,10 @@ class AdminPro:
             data = request.get_json() or {}
             instance = self.crud.create(model, data)
             
-            return jsonify({'success': True, 'data': self.crud.model_to_dict(instance, model)}), 201
+            result = self.crud.model_to_dict(instance, model)
+            self._log_audit('CREATE', model_name, result.get('id'), new_value=result)
+            
+            return jsonify({'success': True, 'data': result}), 201
         
         @bp.route('/api/models/<model_name>/<int:record_id>', methods=['PUT'])
         def api_update_model_data(model_name, record_id):
@@ -342,10 +433,14 @@ class AdminPro:
             if not instance:
                 return jsonify({'error': 'Record not found'}), 404
             
+            old_value = self.crud.model_to_dict(instance, model)
             data = request.get_json() or {}
             instance = self.crud.update(instance, data)
             
-            return jsonify({'success': True, 'data': self.crud.model_to_dict(instance, model)})
+            new_value = self.crud.model_to_dict(instance, model)
+            self._log_audit('UPDATE', model_name, record_id, old_value=old_value, new_value=new_value)
+            
+            return jsonify({'success': True, 'data': new_value})
         
         @bp.route('/api/models/<model_name>/<int:record_id>', methods=['DELETE'])
         def api_delete_model_data(model_name, record_id):
@@ -360,7 +455,10 @@ class AdminPro:
             if not instance:
                 return jsonify({'error': 'Record not found'}), 404
             
+            old_value = self.crud.model_to_dict(instance, model)
             self.crud.delete(instance)
+            
+            self._log_audit('DELETE', model_name, record_id, old_value=old_value)
             
             return jsonify({'success': True})
         
@@ -389,6 +487,138 @@ class AdminPro:
                                          status_min=status_min)
             
             return jsonify(logs)
+        
+        @bp.route('/api/monitor/logs/<int:log_id>', methods=['GET'])
+        def api_monitor_log_detail(log_id):
+            if not self.auth.is_authenticated():
+                return jsonify({'error': 'Unauthorized'}), 401
+            
+            log = self.db.session.get(self.RequestLog, log_id)
+            if not log:
+                return jsonify({'error': 'Log not found'}), 404
+            
+            return jsonify(log.to_dict())
+        
+        # Audit Logs API
+        @bp.route('/api/audit-logs', methods=['GET'])
+        def api_get_audit_logs():
+            if not self.auth.is_authenticated():
+                return jsonify({'error': 'Unauthorized'}), 401
+            
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 50, type=int)
+            action = request.args.get('action', '')
+            resource_type = request.args.get('resource_type', '')
+            
+            query = self.db.session.query(self.AuditLog)
+            
+            if action:
+                query = query.filter(self.AuditLog.action == action)
+            if resource_type:
+                query = query.filter(self.AuditLog.resource_type == resource_type)
+            
+            total = query.count()
+            logs = query.order_by(self.AuditLog.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+            
+            return jsonify({
+                'items': [log.to_dict() for log in logs],
+                'total': total,
+                'page': page,
+                'per_page': per_page,
+                'pages': (total + per_page - 1) // per_page,
+            })
+        
+        # System Config API
+        @bp.route('/api/system-config', methods=['GET'])
+        def api_get_system_config():
+            if not self.auth.is_authenticated():
+                return jsonify({'error': 'Unauthorized'}), 401
+            
+            category = request.args.get('category', '')
+            
+            query = self.db.session.query(self.SystemConfig)
+            if category:
+                query = query.filter(self.SystemConfig.category == category)
+            
+            configs = query.order_by(self.SystemConfig.category, self.SystemConfig.key).all()
+            
+            return jsonify({
+                'items': [c.to_dict() for c in configs],
+                'categories': ['general', 'security', 'email', 'api'],
+            })
+        
+        @bp.route('/api/system-config', methods=['POST'])
+        def api_create_system_config():
+            if not self.auth.is_authenticated():
+                return jsonify({'error': 'Unauthorized'}), 401
+            
+            data = request.get_json() or {}
+            
+            if not data.get('key'):
+                return jsonify({'error': 'Key is required'}), 400
+            
+            existing = self.db.session.query(self.SystemConfig).filter_by(key=data['key']).first()
+            if existing:
+                return jsonify({'error': 'Key already exists'}), 400
+            
+            config = self.SystemConfig(
+                key=data['key'],
+                value=data.get('value', ''),
+                description=data.get('description', ''),
+                category=data.get('category', 'general'),
+                is_public=data.get('is_public', False),
+            )
+            
+            self.db.session.add(config)
+            self.db.session.commit()
+            
+            self._log_audit('CREATE', 'SystemConfig', config.id, new_value=config.to_dict())
+            
+            return jsonify({'success': True, 'config': config.to_dict()}), 201
+        
+        @bp.route('/api/system-config/<int:config_id>', methods=['PUT'])
+        def api_update_system_config(config_id):
+            if not self.auth.is_authenticated():
+                return jsonify({'error': 'Unauthorized'}), 401
+            
+            config = self.db.session.get(self.SystemConfig, config_id)
+            if not config:
+                return jsonify({'error': 'Config not found'}), 404
+            
+            old_value = config.to_dict()
+            data = request.get_json() or {}
+            
+            if 'value' in data:
+                config.value = data['value']
+            if 'description' in data:
+                config.description = data['description']
+            if 'category' in data:
+                config.category = data['category']
+            if 'is_public' in data:
+                config.is_public = data['is_public']
+            
+            self.db.session.commit()
+            
+            self._log_audit('UPDATE', 'SystemConfig', config.id, old_value=old_value, new_value=config.to_dict())
+            
+            return jsonify({'success': True, 'config': config.to_dict()})
+        
+        @bp.route('/api/system-config/<int:config_id>', methods=['DELETE'])
+        def api_delete_system_config(config_id):
+            if not self.auth.is_authenticated():
+                return jsonify({'error': 'Unauthorized'}), 401
+            
+            config = self.db.session.get(self.SystemConfig, config_id)
+            if not config:
+                return jsonify({'error': 'Config not found'}), 404
+            
+            old_value = config.to_dict()
+            self.db.session.delete(config)
+            self.db.session.commit()
+            
+            self._log_audit('DELETE', 'SystemConfig', config_id, old_value=old_value)
+            
+            return jsonify({'success': True})
     
     def _create_default_admin(self, app):
         username = app.config.get('ADMIN_USERNAME', 'admin')
@@ -404,3 +634,31 @@ class AdminPro:
             user.set_password(password)
             self.db.session.add(user)
             self.db.session.commit()
+    
+    def _create_default_configs(self):
+        """Create default system configurations."""
+        defaults = [
+            ('site_name', 'Flask Admin Pro', '站点名称', 'general', True),
+            ('site_description', 'Professional Admin Dashboard', '站点描述', 'general', True),
+            ('items_per_page', '20', '每页显示数量', 'general', True),
+            ('session_timeout', '1440', '会话超时时间(分钟)', 'security', False),
+            ('max_login_attempts', '5', '最大登录尝试次数', 'security', False),
+            ('enable_audit_log', 'true', '启用操作审计', 'security', False),
+            ('smtp_host', '', 'SMTP服务器地址', 'email', False),
+            ('smtp_port', '587', 'SMTP端口', 'email', False),
+            ('api_rate_limit', '100', 'API速率限制(次/分钟)', 'api', False),
+        ]
+        
+        for key, value, desc, category, is_public in defaults:
+            existing = self.db.session.query(self.SystemConfig).filter_by(key=key).first()
+            if not existing:
+                config = self.SystemConfig(
+                    key=key,
+                    value=value,
+                    description=desc,
+                    category=category,
+                    is_public=is_public,
+                )
+                self.db.session.add(config)
+        
+        self.db.session.commit()

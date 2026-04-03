@@ -111,9 +111,23 @@ const activeMenu = computed(() => route.path)
 onMounted(async () => {
   try {
     const res = await getCurrentUser()
-    currentUser.value = res
+    // 后端返回 { authenticated: true, user: {...} }
+    if (res.authenticated && res.user) {
+      currentUser.value = res.user
+    } else {
+      // 尝试从localStorage获取用户信息
+      const storedUser = localStorage.getItem('admin_user')
+      if (storedUser) {
+        currentUser.value = JSON.parse(storedUser)
+      }
+    }
   } catch (error) {
     console.error('获取用户信息失败:', error)
+    // 尝试从localStorage获取用户信息
+    const storedUser = localStorage.getItem('admin_user')
+    if (storedUser) {
+      currentUser.value = JSON.parse(storedUser)
+    }
   }
 })
 
@@ -126,10 +140,15 @@ const handleCommand = async (command) => {
     try {
       await logout()
       localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_user')
       ElMessage.success('退出登录成功')
       router.push('/login')
     } catch (error) {
       console.error('退出登录失败:', error)
+      // 即使API调用失败也清除本地状态并跳转
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_user')
+      router.push('/login')
     }
   } else if (command === 'profile') {
     ElMessage.info('个人中心开发中...')

@@ -1,267 +1,351 @@
 {% extends "admin/base.html" %}
+
 {% block title %}{{ model_name }} - Flask Admin Pro{% endblock %}
-{% block breadcrumb %}模型管理 / {{ model_name }}{% endblock %}
+
+{% block breadcrumb_nav %}
+<a href="{{ url_for('admin.index') }}">首页</a>
+<span class="separator">/</span>
+<a href="{{ url_for('admin.models') }}">模型管理</a>
+<span class="separator">/</span>
+<span class="current">{{ model_name }}</span>
+{% endblock %}
+
+{% block breadcrumb %}{{ model_name }}{% endblock %}
+
 {% block content %}
 <div id="crud-app">
-    <el-card>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 24px; align-items: center;">
-            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                <el-input 
-                    v-model="search" 
-                    placeholder="搜索..." 
-                    style="width: 240px;" 
-                    clearable
-                    prefix-icon="Search"
-                ></el-input>
-                <el-button @click="loadData" type="primary">
-                    <i class="el-icon-search"></i> 搜索
-                </el-button>
-            </div>
-            <el-button type="primary" @click="showCreate" size="large">
-                <i class="el-icon-plus"></i> 新增记录
-            </el-button>
-        </div>
-        
-        <el-table :data="data" v-loading="loading" style="width: 100%;">
-            <el-table-column 
-                v-for="col in columns" 
-                :key="col.name" 
-                :prop="col.name" 
-                :label="col.name" 
-                :sortable="col.is_integer || col.is_datetime"
-                min-width="120"
-            >
-                <template #default="scope">
-                    <span v-if="col.is_datetime && scope.row[col.name]">{{ formatDateTime(scope.row[col.name]) }}</span>
-                    <span v-else-if="col.is_boolean">{{ scope.row[col.name] ? '✅' : '❌' }}</span>
-                    <span v-else>{{ scope.row[col.name] || '' }}</span>
-                </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
-                <template #default="scope">
-                    <el-button size="small" @click="showEdit(scope.row)" type="primary">
-                        <i class="el-icon-edit"></i> 编辑
-                    </el-button>
-                    <el-button size="small" type="danger" @click="handleDelete(scope.row)">
-                        <i class="el-icon-delete"></i> 删除
-                    </el-button>
-                </template>
-            </el-table-column>
-        </el-table>
-        
-        <div v-if="data.length === 0 && !loading" class="empty-state">
-            <i class="el-icon-document"></i>
-            <p>暂无数据</p>
-            <el-button type="primary" @click="showCreate" style="margin-top: 16px;">
-                <i class="el-icon-plus"></i> 新增记录
-            </el-button>
-        </div>
-        
-        <div v-if="data.length > 0" style="margin-top: 24px; display: flex; justify-content: flex-end;">
-            <el-pagination
-                v-model:current-page="page"
-                v-model:page-size="perPage"
-                :page-sizes="[10, 20, 50, 100]"
-                :total="total"
-                layout="total, sizes, prev, pager, next, jumper"
-                @size-change="loadData"
-                @current-change="loadData"
-            ></el-pagination>
-        </div>
-    </el-card>
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('admin.models') }}" class="el-button">
+            <i class="ph ph-arrow-left"></i> 返回模型列表
+        </a>
+    </div>
     
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑记录' : '新增记录'" width="600px">
-        <el-form :model="form" ref="formRef" label-width="150px">
-            <el-form-item 
-                v-for="col in columns" 
-                :key="col.name" 
-                :label="col.name"
-                :required="!col.nullable && !col.primary_key"
-            >
-                <el-input 
-                    v-if="col.is_string && !col.is_datetime" 
-                    v-model="form[col.name]"
-                    :placeholder="`请输入${col.name}`"
-                ></el-input>
-                <el-date-picker
-                    v-else-if="col.is_datetime"
-                    v-model="form[col.name]"
-                    type="datetime"
-                    format="YYYY-MM-DD HH:mm:ss"
-                    value-format="YYYY-MM-DDTHH:mm:ss"
-                    :placeholder="`请选择${col.name}`"
-                    style="width: 100%;"
-                ></el-date-picker>
-                <el-input-number
-                    v-else-if="col.is_integer"
-                    v-model="form[col.name]"
-                    :min="col.is_primary_key ? 1 : undefined"
-                    controls-position="right"
-                    style="width: 100%;"
-                ></el-input-number>
-                <el-switch
-                    v-else-if="col.is_boolean"
-                    v-model="form[col.name]"
-                ></el-switch>
-                <el-input
-                    v-else
-                    v-model="form[col.name]"
-                    :placeholder="`请输入${col.name}`"
-                ></el-input>
-            </el-form-item>
-        </el-form>
-        <template #footer>
-            <el-button @click="dialogVisible = false">取消</el-button>
-            <el-button type="primary" @click="submit" :loading="submitting">确定</el-button>
-        </template>
-    </el-dialog>
+    <div class="el-card">
+        <div class="el-card__header">
+            <span><i class="ph ph-table"></i> {{ model_name }} 数据管理</span>
+            <div class="quick-actions">
+                <input type="text" class="form-input" id="search-input" placeholder="搜索..." style="width: 200px;" onkeyup="if(event.key==='Enter')loadData()">
+                <button class="el-button el-button--primary" onclick="showAddModal()">
+                    <i class="ph ph-plus"></i> 新增记录
+                </button>
+            </div>
+        </div>
+        <div class="el-card__body">
+            <div style="overflow-x: auto;">
+                <table class="data-table" id="data-table">
+                    <thead id="table-head">
+                        <tr><th>加载中...</th></tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <tr>
+                            <td class="empty-state">
+                                <i class="ph ph-spinner ph-spin"></i>
+                                <p>加载中...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="pagination" id="pagination" style="margin-top: 20px; justify-content: center;"></div>
+        </div>
+    </div>
 </div>
 
+<!-- Add/Edit Modal -->
+<div id="record-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <span id="modal-title">新增记录</span>
+            <button class="modal-close-btn" onclick="closeModal()">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+        <div class="modal-body" id="modal-form">
+            <!-- Form fields will be generated here -->
+        </div>
+        <div class="modal-footer">
+            <button class="el-button" onclick="closeModal()">取消</button>
+            <button class="el-button el-button--primary" onclick="saveRecord()">保存</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const modelName = "{{ model_name }}";
-    const modelInfo = {{ model_info|tojson if model_info else '{}' }};
+const modelName = '{{ model_name }}';
+let columns = [];
+let records = [];
+let currentPage = 1;
+let editingId = null;
+
+async function loadData(page = 1) {
+    currentPage = page;
+    const search = document.getElementById('search-input').value;
     
-    const crudApp = {
-        data() {
-            return {
-                loading: false,
-                submitting: false,
-                data: [],
-                columns: modelInfo.columns || [],
-                page: 1,
-                perPage: 20,
-                total: 0,
-                search: '',
-                dialogVisible: false,
-                isEdit: false,
-                editingRecord: null,
-                form: {}
-            };
-        },
-        methods: {
-            resetForm() {
-                this.columns.forEach(col => {
-                    if (col.primary_key) {
-                        this.form[col.name] = null;
-                    } else if (col.is_boolean) {
-                        this.form[col.name] = false;
-                    } else {
-                        this.form[col.name] = '';
-                    }
-                });
-            },
-            formatDateTime(value) {
-                if (!value) return '';
-                try {
-                    return new Date(value).toLocaleString('zh-CN');
-                } catch (error) {
-                    return value;
-                }
-            },
-            async loadData() {
-                this.loading = true;
-                try {
-                    const response = await fetch(
-                        `/__admin__/api/models/${modelName}?page=${this.page}&per_page=${this.perPage}&search=${this.search}&sort_by=id&sort_order=desc`
-                    );
-                    const result = await response.json();
-                    this.data = result.data || [];
-                    this.total = result.total || 0;
-                    if (result.columns) {
-                        this.columns = result.columns;
-                    }
-                } catch (error) {
-                    ElementPlus.ElMessage.error('加载数据失败');
-                } finally {
-                    this.loading = false;
-                }
-            },
-            showCreate() {
-                this.isEdit = false;
-                this.editingRecord = null;
-                this.resetForm();
-                this.dialogVisible = true;
-            },
-            showEdit(record) {
-                this.isEdit = true;
-                this.editingRecord = record;
-                this.columns.forEach(col => {
-                    this.form[col.name] = record[col.name] !== null && record[col.name] !== undefined ? record[col.name] : '';
-                });
-                this.dialogVisible = true;
-            },
-            async submit() {
-                this.submitting = true;
-                try {
-                    const formData = {};
-                    this.columns.forEach(col => {
-                        if (this.form[col.name] !== '' && this.form[col.name] !== null && this.form[col.name] !== undefined) {
-                            formData[col.name] = this.form[col.name];
-                        }
-                    });
-                    
-                    const response = await fetch(
-                        this.isEdit ? `/__admin__/api/models/${modelName}/${this.editingRecord.id}` : `/__admin__/api/models/${modelName}`,
-                        {
-                            method: this.isEdit ? 'PUT' : 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(formData)
-                        }
-                    );
-                    
-                    const result = await response.json();
-                    if (result.success) {
-                        ElementPlus.ElMessage.success(this.isEdit ? '记录更新成功' : '记录创建成功');
-                        this.dialogVisible = false;
-                        this.loadData();
-                    } else {
-                        ElementPlus.ElMessage.error(result.error || '操作失败');
-                    }
-                } catch (error) {
-                    ElementPlus.ElMessage.error('网络错误');
-                } finally {
-                    this.submitting = false;
-                }
-            },
-            async handleDelete(record) {
-                try {
-                    await ElementPlus.ElMessageBox.confirm(
-                        `确定要删除这条记录吗？此操作不可恢复。`,
-                        '确认删除',
-                        {
-                            confirmButtonText: '确定',
-                            cancelButtonText: '取消',
-                            type: 'warning'
-                        }
-                    );
-                    
-                    const response = await fetch(`/__admin__/api/models/${modelName}/${record.id}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    const result = await response.json();
-                    if (result.success) {
-                        ElementPlus.ElMessage.success('记录删除成功');
-                        this.loadData();
-                    } else {
-                        ElementPlus.ElMessage.error(result.error || '删除失败');
-                    }
-                } catch (error) {
-                    // User cancelled
-                }
-            }
-        },
-        async mounted() {
-            this.resetForm();
-            await this.loadData();
+    try {
+        const params = new URLSearchParams({ page, per_page: 20 });
+        if (search) params.append('search', search);
+        
+        const res = await fetch(`/__admin__/api/models/${modelName}?${params}`);
+        const data = await res.json();
+        
+        if (data.error) {
+            Toast.error(data.error);
+            return;
         }
-    };
-    
-    if (document.getElementById('crud-app')) {
-        const { createApp } = Vue;
-        createApp(crudApp).use(ElementPlus).mount('#crud-app');
+        
+        columns = data.columns || [];
+        records = data.items || [];
+        
+        renderTable();
+        renderPagination(data);
+    } catch (e) {
+        console.error('Failed to load data:', e);
+        Toast.error('加载数据失败');
+        document.getElementById('table-body').innerHTML = `
+            <tr><td colspan="10" class="empty-state">
+                <i class="ph ph-warning"></i>
+                <p>加载失败</p>
+            </td></tr>
+        `;
     }
-});
+}
+
+function renderTable() {
+    const thead = document.getElementById('table-head');
+    const tbody = document.getElementById('table-body');
+    
+    // Get display columns (exclude auto fields, limit to 6)
+    const displayCols = columns.filter(c => 
+        c.name !== 'password_hash' && 
+        !c.name.endsWith('_hash')
+    ).slice(0, 6);
+    
+    // Render header
+    thead.innerHTML = `
+        <tr>
+            ${displayCols.map(col => `<th>${col.name}</th>`).join('')}
+            <th style="width: 140px;">操作</th>
+        </tr>
+    `;
+    
+    // Render body
+    if (!records.length) {
+        tbody.innerHTML = `
+            <tr><td colspan="${displayCols.length + 1}" class="empty-state">
+                <i class="ph ph-table"></i>
+                <p>暂无数据</p>
+            </td></tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = records.map(record => `
+        <tr>
+            ${displayCols.map(col => `<td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(String(record[col.name] ?? ''))}">${formatValue(record[col.name], col.type)}</td>`).join('')}
+            <td>
+                <div class="table-actions">
+                    <button class="el-button el-button--text el-button--small" onclick="editRecord(${record.id})">
+                        <i class="ph ph-pencil"></i> 编辑
+                    </button>
+                    <button class="el-button el-button--text el-button--small" style="color: var(--danger-color);" onclick="deleteRecord(${record.id})">
+                        <i class="ph ph-trash"></i> 删除
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function formatValue(value, type) {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'boolean') {
+        return value ? '<span class="badge badge--success">是</span>' : '<span class="badge badge--info">否</span>';
+    }
+    if (type === 'datetime' || type === 'DateTime') {
+        try {
+            return new Date(value).toLocaleString('zh-CN');
+        } catch {
+            return value;
+        }
+    }
+    const str = String(value);
+    if (str.length > 50) {
+        return escapeHtml(str.substring(0, 50)) + '...';
+    }
+    return escapeHtml(str);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function showAddModal() {
+    editingId = null;
+    document.getElementById('modal-title').textContent = '新增记录';
+    renderForm({});
+    document.getElementById('record-modal').style.display = 'flex';
+}
+
+function editRecord(id) {
+    const record = records.find(r => r.id === id);
+    if (!record) return;
+    
+    editingId = id;
+    document.getElementById('modal-title').textContent = '编辑记录';
+    renderForm(record);
+    document.getElementById('record-modal').style.display = 'flex';
+}
+
+function renderForm(record) {
+    const form = document.getElementById('modal-form');
+    // Filter out auto-generated fields
+    const editableCols = columns.filter(c => 
+        c.name !== 'id' && 
+        !c.name.endsWith('_at') && 
+        c.name !== 'password_hash' &&
+        !c.name.endsWith('_hash')
+    );
+    
+    form.innerHTML = editableCols.map(col => `
+        <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">${col.name}</label>
+            ${getInputForColumn(col, record[col.name])}
+        </div>
+    `).join('');
+}
+
+function getInputForColumn(col, value) {
+    const type = (col.type || 'string').toLowerCase();
+    const safeValue = escapeHtml(String(value ?? ''));
+    
+    if (type === 'boolean' || type === 'bool') {
+        return `
+            <select id="field-${col.name}" class="form-input form-select">
+                <option value="true" ${value === true ? 'selected' : ''}>是</option>
+                <option value="false" ${value === false || value === null || value === undefined ? 'selected' : ''}>否</option>
+            </select>
+        `;
+    }
+    
+    if (type === 'integer' || type === 'int' || type === 'float' || type === 'numeric') {
+        return `<input type="number" id="field-${col.name}" class="form-input" value="${value ?? ''}" step="any">`;
+    }
+    
+    if (type === 'text') {
+        return `<textarea id="field-${col.name}" class="form-input" rows="3">${value ?? ''}</textarea>`;
+    }
+    
+    return `<input type="text" id="field-${col.name}" class="form-input" value="${safeValue}">`;
+}
+
+function closeModal() {
+    document.getElementById('record-modal').style.display = 'none';
+    editingId = null;
+}
+
+async function saveRecord() {
+    const editableCols = columns.filter(c => 
+        c.name !== 'id' && 
+        !c.name.endsWith('_at') && 
+        c.name !== 'password_hash' &&
+        !c.name.endsWith('_hash')
+    );
+    const data = {};
+    
+    for (const col of editableCols) {
+        const el = document.getElementById(`field-${col.name}`);
+        if (!el) continue;
+        
+        let value = el.value;
+        const type = (col.type || 'string').toLowerCase();
+        
+        if (type === 'boolean' || type === 'bool') {
+            value = value === 'true';
+        } else if ((type === 'integer' || type === 'int') && value !== '') {
+            value = parseInt(value);
+        } else if ((type === 'float' || type === 'numeric') && value !== '') {
+            value = parseFloat(value);
+        } else if (value === '') {
+            value = null;
+        }
+        
+        data[col.name] = value;
+    }
+    
+    try {
+        let url = `/__admin__/api/models/${modelName}`;
+        let method = 'POST';
+        
+        if (editingId) {
+            url = `/__admin__/api/models/${modelName}/${editingId}`;
+            method = 'PUT';
+        }
+        
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        
+        const result = await res.json();
+        
+        if (result.success) {
+            closeModal();
+            Toast.success(editingId ? '更新成功' : '添加成功');
+            loadData(currentPage);
+        } else {
+            Toast.error(result.error || '保存失败');
+        }
+    } catch (e) {
+        Toast.error('保存失败: ' + e.message);
+    }
+}
+
+async function deleteRecord(id) {
+    if (!confirm('确定要删除此记录吗？')) return;
+    
+    try {
+        const res = await fetch(`/__admin__/api/models/${modelName}/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        
+        if (result.success) {
+            Toast.success('删除成功');
+            loadData(currentPage);
+        } else {
+            Toast.error(result.error || '删除失败');
+        }
+    } catch (e) {
+        Toast.error('删除失败: ' + e.message);
+    }
+}
+
+function renderPagination(data) {
+    const container = document.getElementById('pagination');
+    if (!data.pages || data.pages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = `<span>共 ${data.total} 条</span>`;
+    
+    if (currentPage > 1) {
+        html += `<button class="el-button el-button--small" onclick="loadData(${currentPage - 1})">上一页</button>`;
+    }
+    
+    html += `<span>第 ${currentPage} / ${data.pages} 页</span>`;
+    
+    if (currentPage < data.pages) {
+        html += `<button class="el-button el-button--small" onclick="loadData(${currentPage + 1})">下一页</button>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', loadData);
 </script>
 {% endblock %}

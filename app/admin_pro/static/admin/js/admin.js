@@ -278,6 +278,18 @@ const app = createApp({
         const currentRoute = ref(window.location.pathname.replace('/__admin__', '') || '/');
         const userMenuVisible = ref(false);
         const user = reactive(window.adminPageConfig.user || {});
+        // 为dashboard页面提供响应式stats数据
+        const stats = reactive({ 
+            user_count: 0, 
+            model_count: 0, 
+            request_count: 0, 
+            error_rate: 0 
+        });
+        
+        // 如果有初始stats数据，使用它
+        if (window.adminPageConfig.stats) {
+            Object.assign(stats, window.adminPageConfig.stats);
+        }
         
         const showUserMenu = () => {
             userMenuVisible.value = !userMenuVisible.value;
@@ -298,11 +310,44 @@ const app = createApp({
             ElementPlus.ElMessage.success('主题已切换');
         };
         
-        // Load saved theme
+        const goTo = (path) => {
+            window.location.href = path;
+        };
+        
+        // 加载Dashboard统计数据
+        const loadDashboardStats = async () => {
+            try {
+                // 获取用户数量
+                const usersRes = await fetch('/__admin__/api/users?page=1&per_page=1');
+                const usersData = await usersRes.json();
+                stats.user_count = usersData.total || 0;
+                
+                // 获取模型数量
+                const modelsRes = await fetch('/__admin__/api/models');
+                const modelsData = await modelsRes.json();
+                stats.model_count = modelsData.models?.length || 0;
+                
+                // 获取监控统计
+                const monitorRes = await fetch('/__admin__/api/monitor/stats?range=24');
+                const monitorData = await monitorRes.json();
+                stats.request_count = monitorData.total_requests || 0;
+                stats.error_rate = monitorData.error_rate || 0;
+                
+            } catch (error) {
+                console.error('Failed to load dashboard stats:', error);
+            }
+        };
+        
+        // Load saved theme and dashboard stats
         onMounted(() => {
             const savedTheme = localStorage.getItem('admin-theme');
             if (savedTheme) {
                 document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+            
+            // 如果是dashboard页面，加载统计数据
+            if (window.adminPageConfig.route === 'admin.index') {
+                loadDashboardStats();
             }
         });
         
@@ -310,9 +355,12 @@ const app = createApp({
             currentRoute,
             userMenuVisible,
             user,
+            stats,
             showUserMenu,
             logout,
-            handleThemeChange
+            handleThemeChange,
+            goTo,
+            loadDashboardStats
         };
     }
 });
@@ -321,9 +369,9 @@ const app = createApp({
 document.addEventListener('DOMContentLoaded', function() {
     app.use(ElementPlus).mount('#app');
     
-    // Mount page-specific components if they exist
+    // Dashboard页面的stats已经由主app处理，不需要单独挂载
+    // 只为非嵌套在#app内的组件挂载页面特定逻辑
     const routeMap = {
-        'admin.index': { component: 'dashboard', element: '#dashboard-app' },
         'admin.users': { component: 'users', element: '#users-app' }, 
         'admin.models': { component: 'models', element: '#models-app' },
         'admin.monitor': { component: 'monitor', element: '#monitor-app' }
@@ -333,9 +381,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const pageConfig = routeMap[currentPage];
     
     if (pageConfig && pageComponents[pageConfig.component]) {
-        const { createApp } = Vue;
-        createApp(pageComponents[pageConfig.component])
-            .use(ElementPlus)
-            .mount(pageConfig.element);
+        const el = document.querySelector(pageConfig.element);
+        if (el) {
+            const { createApp } = Vue;
+            createApp(pageComponents[pageConfig.component])
+                .use(ElementPlus)
+                .mount(pageConfig.element);
+        }
     }
 });

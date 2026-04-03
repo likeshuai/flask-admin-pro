@@ -14,26 +14,30 @@ class CRUDManager:
     
     def get_all(self, model, page=1, per_page=20, search=None, sort_by=None, sort_order='asc'):
         query = self.db.session.query(model)
-        
+
         if search:
             search_filters = []
             for col in model.__table__.columns:
-                if col.type.python_type == str:
-                    search_filters.append(col.ilike(f'%{search}%'))
+                try:
+                    if hasattr(col.type, 'python_type') and col.type.python_type == str:
+                        search_filters.append(col.ilike(f'%{search}%'))
+                except (NotImplementedError, AttributeError):
+                    # Some types don't have python_type
+                    pass
             if search_filters:
                 query = query.filter(or_(*search_filters))
-        
+
         if sort_by and hasattr(model, sort_by):
             col = getattr(model, sort_by)
             if sort_order == 'desc':
                 query = query.order_by(col.desc())
             else:
                 query = query.order_by(col.asc())
-        
+
         total = query.count()
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         data = [self.model_to_dict(item, model) for item in pagination.items]
-        
+
         return {
             'data': data,
             'total': total,
@@ -50,14 +54,14 @@ class CRUDManager:
         for col in model.__table__.columns:
             if col.name in data and not col.primary_key:
                 value = data[col.name]
-                if 'datetime' in str(col.type).lower() and value:
+                if value is not None and 'datetime' in str(col.type).lower():
                     try:
                         if isinstance(value, str):
                             value = datetime.fromisoformat(value.replace('Z', '+00:00'))
                     except (ValueError, AttributeError):
                         pass
                 valid_data[col.name] = value
-        
+
         instance = model(**valid_data)
         self.db.session.add(instance)
         self.db.session.commit()
@@ -65,18 +69,18 @@ class CRUDManager:
     
     def update(self, instance, data):
         model = type(instance)
-        
+
         for col in model.__table__.columns:
             if col.name in data and not col.primary_key:
                 value = data[col.name]
-                if 'datetime' in str(col.type).lower() and value:
+                if value is not None and 'datetime' in str(col.type).lower():
                     try:
                         if isinstance(value, str):
                             value = datetime.fromisoformat(value.replace('Z', '+00:00'))
                     except (ValueError, AttributeError):
                         pass
                 setattr(instance, col.name, value)
-        
+
         self.db.session.commit()
         return instance
     

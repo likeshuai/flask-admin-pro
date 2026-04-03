@@ -12,9 +12,15 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      '/admin/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/admin\/api/, '/__admin__/api')
+      },
       '/admin': {
         target: 'http://localhost:5000',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/admin/, '/__admin__')
       }
     }
   },

@@ -7,102 +7,229 @@
     <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
     <link rel="stylesheet" href="{{ url_for('admin.static', filename='admin/css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
     {% block extra_css %}{% endblock %}
+    <!-- Apply theme and sidebar state early to prevent flash -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('admin-theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+        })();
+    </script>
 </head>
 <body>
-    <div id="app">
-        <div class="admin-layout">
-            <aside class="sidebar">
-                <div class="logo">
-                    <div class="logo-icon">🤖</div>
-                    <span>Flask Admin Pro</span>
+    <div id="admin-layout" class="admin-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="logo" onclick="toggleSidebar()" style="cursor: pointer;" title="点击收起/展开">
+                <div class="logo-icon">
+                    <i class="ph ph-lightning"></i>
                 </div>
-                <ul class="sidebar-menu">
-                    <li><a href="{{ url_for('admin.index') }}" :class="{active: currentRoute === '/'}"><i>📊</i> <span>仪表盘</span></a></li>
-                    <li><a href="{{ url_for('admin.users') }}" :class="{active: currentRoute === '/users'}"><i>👥</i> <span>用户管理</span></a></li>
-                    <li><a href="{{ url_for('admin.models') }}" :class="{active: currentRoute === '/models'}"><i>📁</i> <span>模型管理</span></a></li>
-                    <li><a href="{{ url_for('admin.monitor') }}" :class="{active: currentRoute === '/monitor'}"><i>📈</i> <span>监控中心</span></a></li>
-                </ul>
-            </aside>
-            <div class="main-content">
-                <header class="header">
-                    <div class="header-breadcrumb">
-                        <el-breadcrumb separator="/">
-                            <el-breadcrumb-item>首页</el-breadcrumb-item>
-                            <el-breadcrumb-item>{% block breadcrumb %}仪表盘{% endblock %}</el-breadcrumb-item>
-                        </el-breadcrumb>
-                    </div>
-                    <div class="header-right">
-                        <el-dropdown @command="handleThemeChange">
-                            <span class="el-dropdown-link">
-                                <i class="el-icon-sunny"></i>
-                                <span>主题</span>
-                                <i class="el-icon-arrow-down el-icon--right"></i>
-                            </span>
-                            <template #dropdown>
-                                <el-dropdown-menu>
-                                    <el-dropdown-item command="light-blue">🔵 浅蓝主题</el-dropdown-item>
-                                    <el-dropdown-item command="dark-blue">🟣 深蓝主题</el-dropdown-item>
-                                    <el-dropdown-item command="green">🟢 绿色主题</el-dropdown-item>
-                                    <el-dropdown-item command="purple">🟣 紫色主题</el-dropdown-item>
-                                    <el-dropdown-item command="orange">🟠 橙色主题</el-dropdown-item>
-                                    <el-dropdown-item divided command="dark">🌙 黑夜模式</el-dropdown-item>
-                                </el-dropdown-menu>
-                            </template>
-                        </el-dropdown>
-                        <div class="user-info" @click="showUserMenu">
-                            <div class="user-avatar">
-                                {{ user.username ? user.username.charAt(0).toUpperCase() : 'A' }}
-                            </div>
-                            <span>{{ user.username || 'Guest' }}</span>
-                            <i class="el-icon-arrow-down"></i>
-                        </div>
-                        <el-popover 
-                            ref="userMenuRef"
-                            placement="bottom-end"
-                            width="200"
-                            trigger="click"
-                            :visible="userMenuVisible"
-                            @hide="userMenuVisible = false"
-                        >
-                            <template #reference>
-                                <div style="display: none;"></div>
-                            </template>
-                            <div style="padding: 12px 0;">
-                                <el-button 
-                                    plain 
-                                    size="small" 
-                                    style="width: 100%; margin-bottom: 8px;"
-                                    @click="logout"
-                                >
-                                    🚪 退出登录
-                                </el-button>
-                            </div>
-                        </el-popover>
-                    </div>
-                </header>
-                <main class="content">
-                    {% block content %}{% endblock %}
-                </main>
+                <span>Admin Pro</span>
             </div>
+            <ul class="sidebar-menu">
+                <li>
+                    <a href="{{ url_for('admin.index') }}" class="{% if request.endpoint == 'admin.index' %}active{% endif %}">
+                        <span class="menu-icon"><i class="ph ph-chart-pie-slice"></i></span>
+                        <span>仪表盘</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.users') }}" class="{% if request.endpoint == 'admin.users' %}active{% endif %}">
+                        <span class="menu-icon"><i class="ph ph-users-three"></i></span>
+                        <span>用户管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.models') }}" class="{% if request.endpoint == 'admin.models' %}active{% endif %}">
+                        <span class="menu-icon"><i class="ph ph-database"></i></span>
+                        <span>模型管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.monitor') }}" class="{% if request.endpoint == 'admin.monitor' %}active{% endif %}">
+                        <span class="menu-icon"><i class="ph ph-activity"></i></span>
+                        <span>监控中心</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.audit_logs') }}" class="{% if request.endpoint == 'admin.audit_logs' %}active{% endif %}">
+                        <span class="menu-icon"><i class="ph ph-clipboard-text"></i></span>
+                        <span>操作日志</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.system_config') }}" class="{% if request.endpoint == 'admin.system_config' %}active{% endif %}">
+                        <span class="menu-icon"><i class="ph ph-gear-six"></i></span>
+                        <span>系统配置</span>
+                    </a>
+                </li>
+            </ul>
+        </aside>
+        <div class="main-content" id="main-content">
+            <header class="header">
+                <div class="header-breadcrumb">
+                    {% block breadcrumb_nav %}
+                    <a href="{{ url_for('admin.index') }}">首页</a>
+                    <span class="separator">/</span>
+                    <span class="current">{% block breadcrumb %}仪表盘{% endblock %}</span>
+                    {% endblock %}
+                </div>
+                <div class="header-right">
+                    <div class="theme-selector" id="theme-selector">
+                        <div class="theme-trigger" onclick="showThemeMenu()">
+                            <i class="ph ph-palette"></i>
+                            <span>主题</span>
+                        </div>
+                        <div id="theme-menu" class="dropdown-menu" style="display: none;">
+                            <div onclick="changeTheme('')"><i class="ph ph-sun"></i> 默认主题</div>
+                            <div onclick="changeTheme('light-blue')"><i class="ph ph-drop"></i> 天蓝主题</div>
+                            <div onclick="changeTheme('green')"><i class="ph ph-leaf"></i> 翠绿主题</div>
+                            <div onclick="changeTheme('purple')"><i class="ph ph-flower-lotus"></i> 紫罗兰</div>
+                            <div onclick="changeTheme('orange')"><i class="ph ph-flame"></i> 暖橙主题</div>
+                            <div onclick="changeTheme('dark')"><i class="ph ph-moon"></i> 暗黑模式</div>
+                        </div>
+                    </div>
+                    <div class="user-dropdown" id="user-dropdown">
+                        <div class="user-info" onclick="showUserMenu()">
+                            <div class="user-avatar">{{ user.username[0].upper() if user and user.username else 'A' }}</div>
+                            <span>{{ user.username if user else 'Guest' }}</span>
+                            <i class="ph ph-caret-down" style="font-size: 12px; color: var(--text-tertiary);"></i>
+                        </div>
+                        <div id="user-menu" class="dropdown-menu" style="display: none;">
+                            <div onclick="logout()"><i class="ph ph-sign-out"></i> 退出登录</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            <main class="content">
+                {% block content %}{% endblock %}
+            </main>
         </div>
     </div>
     
-    <!-- Global page data -->
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
     <script>
-        // Global configuration for the current page
         window.adminPageConfig = {
             route: '{{ request.endpoint or "" }}',
             user: {{ user.to_dict()|tojson if user else '{}' }},
             {% block page_data %}{% endblock %}
         };
+
+        // Toast notification system
+        window.Toast = {
+            show: function(message, type = 'info', duration = 3000) {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+
+                const icons = {
+                    success: 'check-circle',
+                    error: 'x-circle',
+                    warning: 'warning',
+                    info: 'info'
+                };
+
+                toast.innerHTML = `
+                    <i class="ph ph-${icons[type] || 'info'}"></i>
+                    <span>${message}</span>
+                `;
+
+                container.appendChild(toast);
+
+                setTimeout(() => toast.classList.add('show'), 10);
+
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            },
+            success: function(msg) { this.show(msg, 'success'); },
+            error: function(msg) { this.show(msg, 'error'); },
+            warning: function(msg) { this.show(msg, 'warning'); },
+            info: function(msg) { this.show(msg, 'info'); }
+        };
+
+        function showThemeMenu() {
+            closeAllDropdowns();
+            document.getElementById('theme-menu').style.display = 'block';
+        }
+
+        function showUserMenu() {
+            closeAllDropdowns();
+            document.getElementById('user-menu').style.display = 'block';
+        }
+
+        function closeAllDropdowns() {
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display = 'none');
+        }
+
+        function changeTheme(theme) {
+            if (theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('admin-theme', theme);
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.removeItem('admin-theme');
+            }
+            closeAllDropdowns();
+        }
+
+        async function logout() {
+            try {
+                await fetch('/__admin__/api/logout', { method: 'POST' });
+                window.location.href = '/__admin__/login';
+            } catch (e) {
+                Toast.error('退出失败');
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('sidebar-collapsed');
+
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('admin-sidebar-collapsed', isCollapsed);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme is already applied in <head>, just ensure consistency
+            const savedTheme = localStorage.getItem('admin-theme');
+            if (savedTheme && !document.documentElement.getAttribute('data-theme')) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+
+            // Apply sidebar collapsed state immediately (no animation on page load)
+            const sidebarCollapsed = localStorage.getItem('admin-sidebar-collapsed') === 'true';
+            if (sidebarCollapsed) {
+                document.getElementById('sidebar').classList.add('collapsed');
+                document.getElementById('main-content').classList.add('sidebar-collapsed');
+            }
+
+            // Close dropdowns on click outside
+            document.addEventListener('click', function(e) {
+                const themeSelector = document.getElementById('theme-selector');
+                const userDropdown = document.getElementById('user-dropdown');
+
+                if (themeSelector && !themeSelector.contains(e.target)) {
+                    document.getElementById('theme-menu').style.display = 'none';
+                }
+                if (userDropdown && !userDropdown.contains(e.target)) {
+                    document.getElementById('user-menu').style.display = 'none';
+                }
+            });
+        });
     </script>
-    
-    <!-- External JavaScript files -->
+
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/element-plus"></script>
-    <script src="{{ url_for('admin.static', filename='admin/js/admin.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

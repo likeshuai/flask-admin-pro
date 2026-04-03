@@ -2,16 +2,23 @@ import request from './request'
 
 export function getStats(hours = 24) {
   return request({
-    url: '/v1/stats',
+    url: '/monitor/stats',
     method: 'get',
-    params: { hours }
+    params: { range: hours }
   })
 }
 
-export function getHourlyStats(hours = 24) {
+export function getMonitorLogs(params = {}) {
   return request({
-    url: '/v1/stats/hourly',
+    url: '/monitor/logs',
     method: 'get',
-    params: { hours }
+    params
+  })
+}
+
+export function getModels() {
+  return request({
+    url: '/models',
+    method: 'get'
   })
 }

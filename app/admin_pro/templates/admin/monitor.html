@@ -1,149 +1,307 @@
 {% extends "admin/base.html" %}
+
 {% block title %}监控中心 - Flask Admin Pro{% endblock %}
+
+{% block breadcrumb_nav %}
+<a href="{{ url_for('admin.index') }}">首页</a>
+<span class="separator">/</span>
+<span class="current">监控中心</span>
+{% endblock %}
+
 {% block breadcrumb %}监控中心{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div id="monitor-app">
     <div class="stat-grid">
-        <div class="stat-card" style="background: linear-gradient(135deg, #409EFF 0%, #667eea 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                📊
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-primary"><i class="ph ph-chart-line-up"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.total_requests || 0 }}</div>
+                <div class="stat-value" id="total-requests">{{ stats.total_requests or 0 }}</div>
                 <div class="stat-label">总请求数</div>
             </div>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #F56C6C 0%, #f44336 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                ⚠️
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-danger"><i class="ph ph-warning-circle"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.error_requests || 0 }}</div>
+                <div class="stat-value" id="error-requests">{{ stats.error_requests or 0 }}</div>
                 <div class="stat-label">错误请求</div>
             </div>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #E6A23C 0%, #ff9800 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                📈
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-warning"><i class="ph ph-percent"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.error_rate || 0 }}%</div>
+                <div class="stat-value" id="error-rate">{{ stats.error_rate or 0 }}%</div>
                 <div class="stat-label">错误率</div>
             </div>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #67C23A 0%, #4caf50 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                ⚡
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-success"><i class="ph ph-timer"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.avg_response_time || 0 }}ms</div>
-                <div class="stat-label">平均响应时间</div>
+                <div class="stat-value" id="avg-response">{{ "%.2f"|format(stats.avg_response_time or 0) }}ms</div>
+                <div class="stat-label">平均响应</div>
             </div>
         </div>
     </div>
-    
-    <el-card>
-        <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>📝 请求日志</span>
-                <el-button type="primary" size="small" @click="loadLogs">
-                    <i class="el-icon-refresh"></i> 刷新
-                </el-button>
-            </div>
-        </template>
-        
-        <el-table :data="logs" v-loading="loading" style="width: 100%;">
-            <el-table-column prop="id" label="ID" width="80" sortable></el-table-column>
-            <el-table-column prop="method" label="方法" width="100">
-                <template #default="scope">
-                    <el-tag :type="getMethodType(scope.row.method)" size="medium">{{ scope.row.method }}</el-tag>
-                </template>
-            </el-table-column>
-            <el-table-column prop="path" label="路径" min-width="250"></el-table-column>
-            <el-table-column prop="status_code" label="状态" width="100">
-                <template #default="scope">
-                    <el-tag :type="getStatusType(scope.row.status_code)" size="medium">{{ scope.row.status_code }}</el-tag>
-                </template>
-            </el-table-column>
-            <el-table-column prop="response_time" label="响应时间" width="120">
-                <template #default="scope">
-                    {{ (scope.row.response_time || 0).toFixed(2) }}ms
-                </template>
-            </el-table-column>
-            <el-table-column prop="ip_address" label="IP 地址" width="140"></el-table-column>
-            <el-table-column prop="created_at" label="时间" width="180"></el-table-column>
-        </el-table>
-        
-        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
-            <el-pagination
-                v-model:current-page="page"
-                v-model:page-size="perPage"
-                :page-sizes="[20, 50, 100]"
-                :total="total"
-                layout="total, sizes, prev, pager, next, jumper"
-                @size-change="loadLogs"
-                @current-change="loadLogs"
-            ></el-pagination>
-        </div>
-    </el-card>
-</div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const monitorApp = {
-        data() {
-            return {
-                loading: false,
-                stats: {},
-                logs: [],
-                page: 1,
-                perPage: 50,
-                total: 0
-            };
-        },
-        methods: {
-            async loadStats() {
-                try {
-                    const response = await fetch('/__admin__/api/monitor/stats?range=24');
-                    const data = await response.json();
-                    this.stats = data;
-                } catch (error) {
-                    console.error('Failed to load stats:', error);
-                }
-            },
-            async loadLogs() {
-                this.loading = true;
-                try {
-                    const response = await fetch(`/__admin__/api/monitor/logs?page=${this.page}&per_page=${this.perPage}`);
-                    const data = await response.json();
-                    this.logs = data.logs || [];
-                    this.total = data.total || 0;
-                } catch (error) {
-                    ElementPlus.ElMessage.error('加载日志失败');
-                } finally {
-                    this.loading = false;
-                }
-            },
-            getMethodType(method) {
-                const types = { GET: '', POST: 'success', PUT: 'warning', DELETE: 'danger' };
-                return types[method] || '';
-            },
-            getStatusType(code) {
-                if (code >= 200 && code < 300) return 'success';
-                if (code >= 400) return 'danger';
-                return 'info';
-            }
-        },
-        async mounted() {
-            await this.loadStats();
-            await this.loadLogs();
-        }
-    };
+    <div class="el-card">
+        <div class="el-card__header">
+            <span><i class="ph ph-chart-line"></i> 请求趋势</span>
+            <select class="form-input form-select" id="time-range" style="width: 120px;" onchange="loadStats()">
+                <option value="1">最近1小时</option>
+                <option value="6">最近6小时</option>
+                <option value="24" selected>最近24小时</option>
+                <option value="72">最近3天</option>
+                <option value="168">最近7天</option>
+            </select>
+        </div>
+        <div class="el-card__body">
+            <div id="chart" style="height: 320px;"></div>
+        </div>
+    </div>
     
-    if (document.getElementById('monitor-app')) {
-        const { createApp } = Vue;
-        createApp(monitorApp).use(ElementPlus).mount('#monitor-app');
+    <div class="el-card">
+        <div class="el-card__header">
+            <span><i class="ph ph-list-bullets"></i> 请求日志</span>
+            <div class="quick-actions">
+                <select class="form-input form-select" id="filter-method" style="width: 100px;">
+                    <option value="">全部</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+                <select class="form-input form-select" id="filter-status" style="width: 120px;">
+                    <option value="">全部状态</option>
+                    <option value="400">仅错误(4xx+)</option>
+                    <option value="500">仅服务器错误</option>
+                </select>
+                <button class="el-button el-button--primary" onclick="loadLogs()">
+                    <i class="ph ph-funnel"></i> 筛选
+                </button>
+            </div>
+        </div>
+        <div class="el-card__body">
+            <table class="data-table" id="logs-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 140px;">时间</th>
+                        <th style="width: 80px;">方法</th>
+                        <th>路径</th>
+                        <th style="width: 80px;">状态</th>
+                        <th style="width: 100px;">响应时间</th>
+                        <th style="width: 120px;">IP地址</th>
+                        <th style="width: 80px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-body">
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            <i class="ph ph-spinner ph-spin"></i>
+                            <p>加载中...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="pagination" id="pagination" style="margin-top: 20px; justify-content: center;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let chart = null;
+let currentPage = 1;
+
+async function loadStats() {
+    const range = document.getElementById('time-range').value;
+    try {
+        const res = await fetch(`/__admin__/api/monitor/stats?range=${range}`);
+        const data = await res.json();
+
+        document.getElementById('total-requests').textContent = data.total_requests || 0;
+        document.getElementById('error-requests').textContent = data.error_requests || 0;
+        document.getElementById('error-rate').textContent = (data.error_rate || 0) + '%';
+        document.getElementById('avg-response').textContent = (data.avg_response_time || 0).toFixed(2) + 'ms';
+
+        updateChart(data.requests_by_hour || []);
+    } catch (e) {
+        console.error('Failed to load stats:', e);
     }
+}
+
+function updateChart(data) {
+    if (!chart) {
+        chart = echarts.init(document.getElementById('chart'));
+    }
+
+    const hours = data.map(d => d.hour ? d.hour.split(' ')[1] || d.hour : '');
+    const counts = data.map(d => d.count || 0);
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    const option = {
+        backgroundColor: 'transparent',
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: isDark ? '#374151' : '#fff',
+            borderColor: isDark ? '#4b5563' : '#e5e7eb',
+            textStyle: { color: isDark ? '#f3f4f6' : '#1f2937' }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '10%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: hours,
+            axisLine: { lineStyle: { color: isDark ? '#4b5563' : '#e5e7eb' } },
+            axisLabel: { color: isDark ? '#9ca3af' : '#6b7280' }
+        },
+        yAxis: {
+            type: 'value',
+            axisLine: { lineStyle: { color: isDark ? '#4b5563' : '#e5e7eb' } },
+            axisLabel: { color: isDark ? '#9ca3af' : '#6b7280' },
+            splitLine: { lineStyle: { color: isDark ? '#374151' : '#f3f4f6' } }
+        },
+        series: [{
+            data: counts,
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { width: 3, color: '#3b82f6' },
+            itemStyle: { color: '#3b82f6' },
+            areaStyle: {
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+                        { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                    ]
+                }
+            }
+        }]
+    };
+
+    chart.setOption(option);
+}
+
+async function loadLogs(page = 1) {
+    currentPage = page;
+    const method = document.getElementById('filter-method').value;
+    const status = document.getElementById('filter-status').value;
+
+    const params = new URLSearchParams({ page, per_page: 20 });
+    if (method) params.append('method', method);
+    if (status) params.append('status_min', status);
+
+    try {
+        const res = await fetch(`/__admin__/api/monitor/logs?${params}`);
+        const data = await res.json();
+
+        renderTable(data.logs || []);
+        renderPagination(data);
+    } catch (e) {
+        console.error('Failed to load logs:', e);
+    }
+}
+
+function renderTable(logs) {
+    const tbody = document.getElementById('logs-body');
+
+    if (!logs.length) {
+        tbody.innerHTML = `
+            <tr><td colspan="8" class="empty-state">
+                <i class="ph ph-clipboard"></i>
+                <p>暂无日志记录</p>
+            </td></tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = logs.map(log => `
+        <tr>
+            <td>${log.id}</td>
+            <td>${formatTime(log.created_at)}</td>
+            <td>${getMethodBadge(log.method)}</td>
+            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.path}">${log.path}</td>
+            <td>${getStatusBadge(log.status_code)}</td>
+            <td>${log.response_time ? log.response_time.toFixed(2) + 'ms' : '-'}</td>
+            <td style="font-family: monospace; font-size: 12px;">${log.ip_address || '-'}</td>
+            <td>
+                <a href="/__admin__/monitor/${log.id}" class="el-button el-button--text el-button--small">
+                    <i class="ph ph-eye"></i> 详情
+                </a>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function getMethodBadge(method) {
+    const colors = {
+        'GET': 'badge--success',
+        'POST': 'badge--primary',
+        'PUT': 'badge--warning',
+        'DELETE': 'badge--danger'
+    };
+    return `<span class="badge ${colors[method] || 'badge--info'}">${method}</span>`;
+}
+
+function getStatusBadge(code) {
+    if (code < 300) return `<span class="badge badge--success">${code}</span>`;
+    if (code < 400) return `<span class="badge badge--warning">${code}</span>`;
+    return `<span class="badge badge--danger">${code}</span>`;
+}
+
+function formatTime(isoStr) {
+    if (!isoStr) return '-';
+    const d = new Date(isoStr);
+    return d.toLocaleString('zh-CN', {
+        month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+}
+
+function renderPagination(data) {
+    const container = document.getElementById('pagination');
+    if (!data.pages || data.pages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = `<span>共 ${data.total} 条</span>`;
+
+    if (currentPage > 1) {
+        html += `<button class="el-button el-button--small" onclick="loadLogs(${currentPage - 1})">上一页</button>`;
+    }
+
+    html += `<span>第 ${currentPage} / ${data.pages} 页</span>`;
+
+    if (currentPage < data.pages) {
+        html += `<button class="el-button el-button--small" onclick="loadLogs(${currentPage + 1})">下一页</button>`;
+    }
+
+    container.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
+    loadLogs();
+});
+
+window.addEventListener('resize', function() {
+    if (chart) chart.resize();
 });
 </script>
 {% endblock %}

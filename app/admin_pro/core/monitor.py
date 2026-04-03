@@ -2,7 +2,7 @@
 Monitoring manager for Flask Admin Pro.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 
 
@@ -13,7 +13,8 @@ class MonitorManager:
         self.db = db
         self.RequestLog = RequestLog
     
-    def log_request(self, method, path, status_code, response_time, ip_address):
+    def log_request(self, method, path, status_code, response_time, ip_address,
+                    user_agent=None, request_headers=None, request_body=None, response_body=None):
         if not self.db or not self.RequestLog:
             return
         
@@ -23,6 +24,10 @@ class MonitorManager:
             status_code=status_code,
             response_time=response_time,
             ip_address=ip_address,
+            user_agent=user_agent,
+            request_headers=request_headers,
+            request_body=request_body,
+            response_body=response_body,
         )
         self.db.session.add(log)
         self.db.session.commit()
@@ -30,31 +35,38 @@ class MonitorManager:
     def get_stats(self, range_hours=24):
         if not self.db or not self.RequestLog:
             return {}
-        
-        since = datetime.utcnow() - timedelta(hours=range_hours)
-        
-        total_requests = self.db.session.query(self.RequestLog).filter(self.RequestLog.created_at >= since).count()
+
+        # Use local time for display, UTC for storage
+        from datetime import timezone as tz
+        now = datetime.now(tz.utc)
+        since = now - timedelta(hours=range_hours)
+
+        # Convert to naive datetime for SQLite comparison
+        since_naive = since.replace(tzinfo=None)
+
+        total_requests = self.db.session.query(self.RequestLog).filter(self.RequestLog.created_at >= since_naive).count()
         error_requests = self.db.session.query(self.RequestLog).filter(
-            self.RequestLog.created_at >= since,
+            self.RequestLog.created_at >= since_naive,
             self.RequestLog.status_code >= 400
         ).count()
-        
+
         avg_response = self.db.session.query(
             func.avg(self.RequestLog.response_time)
-        ).filter(self.RequestLog.created_at >= since).scalar() or 0
-        
+        ).filter(self.RequestLog.created_at >= since_naive).scalar() or 0
+
+        # Get hourly stats - use local timezone for display
         hourly_stats = self.db.session.query(
             func.strftime('%Y-%m-%d %H:00', self.RequestLog.created_at).label('hour'),
             func.count(self.RequestLog.id).label('count')
         ).filter(
-            self.RequestLog.created_at >= since
-        ).group_by('hour').all()
-        
+            self.RequestLog.created_at >= since_naive
+        ).group_by('hour').order_by('hour').all()
+
         requests_by_hour = [
             {'hour': row.hour, 'count': row.count}
             for row in hourly_stats
         ]
-        
+
         return {
             'total_requests': total_requests,
             'error_requests': error_requests,

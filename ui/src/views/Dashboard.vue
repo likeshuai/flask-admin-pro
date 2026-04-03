@@ -131,13 +131,19 @@ const loadData = async (hours) => {
   try {
     const res = await getStats(hours)
     
+    // 后端返回: total_requests, error_requests, error_rate, avg_response_time, requests_by_hour
     stats[0].value = res.total_requests?.toLocaleString() || '0'
-    stats[1].value = res.avg_duration_ms?.toFixed(2) || '0'
-    stats[2].value = res.error_count?.toLocaleString() || '0'
+    stats[1].value = res.avg_response_time?.toFixed(2) || '0'
+    stats[2].value = res.error_requests?.toLocaleString() || '0'
     stats[3].value = (res.error_rate || 0) + '%'
     
-    if (res.hourly_data) {
-      updateChart(res.hourly_data)
+    // 处理小时统计数据
+    if (res.requests_by_hour && res.requests_by_hour.length > 0) {
+      const hourlyData = {
+        labels: res.requests_by_hour.map(item => item.hour),
+        data: res.requests_by_hour.map(item => item.count)
+      }
+      updateChart(hourlyData)
     }
   } catch (error) {
     console.error('加载数据失败:', error)

@@ -1,90 +1,259 @@
 {% extends "admin/base.html" %}
+
 {% block title %}仪表盘 - Flask Admin Pro{% endblock %}
+
 {% block breadcrumb %}仪表盘{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+{% endblock %}
+
 {% block content %}
-<div id="dashboard-app" v-cloak>
+<div id="dashboard-app">
     <div class="stat-grid">
-        <div class="stat-card" style="background: linear-gradient(135deg, #409EFF 0%, #667eea 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                👥
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-primary"><i class="ph ph-users-three"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.user_count }}</div>
-                <div class="stat-label">用户总数</div>
+                <div class="stat-value" id="user-count">{{ stats.user_count or 0 }}</div>
+                <div class="stat-label">系统用户</div>
             </div>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #67C23A 0%, #4caf50 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                📁
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-success"><i class="ph ph-database"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.model_count }}</div>
+                <div class="stat-value" id="model-count">{{ stats.model_count or 0 }}</div>
                 <div class="stat-label">数据模型</div>
             </div>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #E6A23C 0%, #ff9800 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                📊
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-warning"><i class="ph ph-chart-line-up"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.request_count }}</div>
+                <div class="stat-value" id="request-count">{{ stats.request_count or 0 }}</div>
                 <div class="stat-label">今日请求</div>
             </div>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #F56C6C 0%, #f44336 100%);">
-            <div class="stat-icon" style="background: rgba(255,255,255,0.2);">
-                ⚠️
-            </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-danger"><i class="ph ph-warning-octagon"></i></div>
             <div class="stat-info">
-                <div class="stat-value">{{ stats.error_rate }}%</div>
+                <div class="stat-value" id="error-rate">{{ stats.error_rate or 0 }}%</div>
                 <div class="stat-label">错误率</div>
             </div>
         </div>
     </div>
     
-    <el-card>
-        <template #header>
-            <span>⚡ 快捷操作</span>
-        </template>
-        <div class="quick-actions">
-            <el-button type="primary" @click="goTo('/__admin__/users')" size="large">
-                👥 用户管理
-            </el-button>
-            <el-button type="success" @click="goTo('/__admin__/models')" size="large">
-                📁 模型管理
-            </el-button>
-            <el-button type="warning" @click="goTo('/__admin__/monitor')" size="large">
-                📈 监控中心
-            </el-button>
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+        <div class="el-card">
+            <div class="el-card__header">
+                <span><i class="ph ph-chart-line"></i> 请求趋势</span>
+                <select class="form-input form-select" id="time-range" style="width: 120px;" onchange="loadChartData()">
+                    <option value="1">最近1小时</option>
+                    <option value="6">最近6小时</option>
+                    <option value="24" selected>最近24小时</option>
+                    <option value="72">最近3天</option>
+                </select>
+            </div>
+            <div class="el-card__body">
+                <div id="chart" style="height: 280px;"></div>
+            </div>
         </div>
-    </el-card>
+        
+        <div class="el-card">
+            <div class="el-card__header">
+                <span><i class="ph ph-lightning"></i> 快捷操作</span>
+            </div>
+            <div class="el-card__body">
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <a href="{{ url_for('admin.users') }}" class="el-button" style="justify-content: flex-start;">
+                        <i class="ph ph-user-plus"></i> 管理用户
+                    </a>
+                    <a href="{{ url_for('admin.models') }}" class="el-button" style="justify-content: flex-start;">
+                        <i class="ph ph-table"></i> 数据管理
+                    </a>
+                    <a href="{{ url_for('admin.monitor') }}" class="el-button" style="justify-content: flex-start;">
+                        <i class="ph ph-pulse"></i> 监控中心
+                    </a>
+                    <a href="{{ url_for('admin.audit_logs') }}" class="el-button" style="justify-content: flex-start;">
+                        <i class="ph ph-clipboard-text"></i> 操作日志
+                    </a>
+                    <a href="{{ url_for('admin.system_config') }}" class="el-button" style="justify-content: flex-start;">
+                        <i class="ph ph-gear-six"></i> 系统配置
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
     
-    <el-card>
-        <template #header>
-            <span>🚀 系统状态</span>
-        </template>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;">
-            <div class="stat-card" style="border: 2px solid #409EFF;">
-                <div class="stat-info" style="text-align: center;">
-                    <div class="stat-value" style="color: #409EFF;">✅</div>
-                    <div class="stat-label">系统运行正常</div>
-                </div>
-            </div>
-            <div class="stat-card" style="border: 2px solid #67C23A;">
-                <div class="stat-info" style="text-align: center;">
-                    <div class="stat-value" style="color: #67C23A;">🔒</div>
-                    <div class="stat-label">安全认证已启用</div>
-                </div>
-            </div>
-            <div class="stat-card" style="border: 2px solid #E6A23C;">
-                <div class="stat-info" style="text-align: center;">
-                    <div class="stat-value" style="color: #E6A23C;">📱</div>
-                    <div class="stat-label">响应式设计支持</div>
-                </div>
-            </div>
+    <div class="el-card" style="margin-top: 24px;">
+        <div class="el-card__header">
+            <span><i class="ph ph-clock-clockwise"></i> 最近活动</span>
+            <a href="{{ url_for('admin.audit_logs') }}" class="el-button el-button--text el-button--small">
+                查看全部 <i class="ph ph-arrow-right"></i>
+            </a>
         </div>
-    </el-card>
+        <div class="el-card__body">
+            <table class="data-table" id="activity-table">
+                <thead>
+                    <tr>
+                        <th style="width: 140px;">时间</th>
+                        <th style="width: 100px;">用户</th>
+                        <th style="width: 80px;">操作</th>
+                        <th>资源</th>
+                        <th style="width: 120px;">IP地址</th>
+                    </tr>
+                </thead>
+                <tbody id="activity-body">
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <i class="ph ph-spinner ph-spin"></i>
+                            <p>加载中...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
+{% endblock %}
 
-{% block page_data %}stats: {{ stats|tojson }}{% endblock %}
+{% block extra_js %}
+<script>
+let chart = null;
+
+async function loadChartData() {
+    const range = document.getElementById('time-range').value;
+    try {
+        const res = await fetch(`/__admin__/api/monitor/stats?range=${range}`);
+        const data = await res.json();
+        
+        document.getElementById('request-count').textContent = data.total_requests || 0;
+        document.getElementById('error-rate').textContent = (data.error_rate || 0) + '%';
+        
+        updateChart(data.requests_by_hour || []);
+    } catch (e) {
+        console.error('Failed to load chart data:', e);
+    }
+}
+
+function updateChart(data) {
+    if (!chart) {
+        chart = echarts.init(document.getElementById('chart'));
+    }
+    
+    const hours = data.map(d => d.hour ? d.hour.split(' ')[1] || d.hour : '');
+    const counts = data.map(d => d.count || 0);
+    
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    
+    const option = {
+        backgroundColor: 'transparent',
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: isDark ? '#374151' : '#fff',
+            borderColor: isDark ? '#4b5563' : '#e5e7eb',
+            textStyle: { color: isDark ? '#f3f4f6' : '#1f2937' }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '10%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: hours,
+            axisLine: { lineStyle: { color: isDark ? '#4b5563' : '#e5e7eb' } },
+            axisLabel: { color: isDark ? '#9ca3af' : '#6b7280' }
+        },
+        yAxis: {
+            type: 'value',
+            axisLine: { lineStyle: { color: isDark ? '#4b5563' : '#e5e7eb' } },
+            axisLabel: { color: isDark ? '#9ca3af' : '#6b7280' },
+            splitLine: { lineStyle: { color: isDark ? '#374151' : '#f3f4f6' } }
+        },
+        series: [{
+            data: counts,
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { width: 3, color: '#3b82f6' },
+            itemStyle: { color: '#3b82f6' },
+            areaStyle: {
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+                        { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                    ]
+                }
+            }
+        }]
+    };
+    
+    chart.setOption(option);
+}
+
+async function loadRecentActivity() {
+    try {
+        const res = await fetch('/__admin__/api/audit-logs?per_page=5');
+        const data = await res.json();
+        
+        const tbody = document.getElementById('activity-body');
+        const items = data.items || [];
+        
+        if (!items.length) {
+            tbody.innerHTML = `
+                <tr><td colspan="5" class="empty-state">
+                    <i class="ph ph-clock"></i>
+                    <p>暂无活动记录</p>
+                </td></tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = items.map(log => `
+            <tr>
+                <td>${formatTime(log.created_at)}</td>
+                <td><span class="badge badge--primary">${log.username || '-'}</span></td>
+                <td>${getActionBadge(log.action)}</td>
+                <td>${log.resource_type || '-'} ${log.resource_id ? '#' + log.resource_id : ''}</td>
+                <td style="font-family: monospace; font-size: 12px;">${log.ip_address || '-'}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load activity:', e);
+    }
+}
+
+function getActionBadge(action) {
+    const badges = {
+        'LOGIN': '<span class="badge badge--success">登录</span>',
+        'LOGOUT': '<span class="badge badge--info">登出</span>',
+        'CREATE': '<span class="badge badge--primary">创建</span>',
+        'UPDATE': '<span class="badge badge--warning">更新</span>',
+        'DELETE': '<span class="badge badge--danger">删除</span>',
+    };
+    return badges[action] || `<span class="badge">${action}</span>`;
+}
+
+function formatTime(isoStr) {
+    if (!isoStr) return '-';
+    const d = new Date(isoStr);
+    return d.toLocaleString('zh-CN', {
+        month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadChartData();
+    loadRecentActivity();
+});
+
+window.addEventListener('resize', function() {
+    if (chart) chart.resize();
+});
+</script>
 {% endblock %}

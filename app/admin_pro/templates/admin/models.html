@@ -1,132 +1,94 @@
 {% extends "admin/base.html" %}
+
 {% block title %}模型管理 - Flask Admin Pro{% endblock %}
+
+{% block breadcrumb_nav %}
+<a href="{{ url_for('admin.index') }}">首页</a>
+<span class="separator">/</span>
+<span class="current">模型管理</span>
+{% endblock %}
+
 {% block breadcrumb %}模型管理{% endblock %}
+
 {% block content %}
 <div id="models-app">
-    <el-card>
-        <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>📁 数据模型列表</span>
-                <el-button type="primary" size="small" @click="refreshModels">
-                    <i class="el-icon-refresh"></i> 刷新
-                </el-button>
-            </div>
-        </template>
-        
-        <el-table :data="models" v-loading="loading" style="width: 100%;">
-            <el-table-column prop="name" label="模型名称" min-width="200">
-                <template #default="scope">
-                    <el-tag type="success" size="medium">
-                        {{ scope.row.name }}
-                    </el-tag>
-                </template>
-            </el-table-column>
-            <el-table-column prop="table" label="数据表" min-width="200"></el-table-column>
-            <el-table-column label="记录数" width="120">
-                <template #default="scope">
-                    <el-badge :value="scope.row.record_count || 0" type="primary"></el-badge>
-                </template>
-            </el-table-column>
-            <el-table-column label="操作" width="180" fixed="right">
-                <template #default="scope">
-                    <el-button type="primary" size="small" @click="goToModel(scope.row.name)">
-                        <i class="el-icon-data-analysis"></i> 管理数据
-                    </el-button>
-                </template>
-            </el-table-column>
-        </el-table>
-        
-        <el-empty v-if="models.length === 0 && !loading" description="暂无数据模型">
-            <template #image>
-                <i class="el-icon-files" style="font-size: 48px; color: #909399;"></i>
-            </template>
-            <template #description>
-                <p>系统将自动扫描 SQLAlchemy 模型</p>
-            </template>
-        </el-empty>
-    </el-card>
-    
-    <el-card style="margin-top: 24px;">
-        <template #header>
-            <span>💡 使用说明</span>
-        </template>
-        <div style="color: var(--text-secondary); line-height: 1.8;">
-            <el-alert title="自动模型发现" type="info" show-icon style="margin-bottom: 16px;">
-                Flask Admin Pro 会自动扫描应用中的所有 SQLAlchemy 模型，并为每个模型生成完整的 CRUD 界面。
-            </el-alert>
-            
-            <el-alert title="功能特性" type="success" show-icon style="margin-bottom: 16px;">
-                <ul style="padding-left: 20px; margin-top: 8px;">
-                    <li>🔍 智能字段类型识别（字符串、数字、日期等）</li>
-                    <li>📊 支持分页、搜索、排序</li>
-                    <li>⚡ 实时数据操作（增删改查）</li>
-                    <li>📱 完全响应式设计</li>
-                </ul>
-            </el-alert>
-            
-            <el-alert title="注意事项" type="warning" show-icon>
-                <p>确保您的模型继承自 SQLAlchemy 的 Model 类，并且在应用上下文中正确注册。</p>
-            </el-alert>
+    <div class="el-card">
+        <div class="el-card__header">
+            <span><i class="ph ph-database"></i> 数据模型</span>
+            <button class="el-button" onclick="loadModels()">
+                <i class="ph ph-arrows-clockwise"></i> 刷新
+            </button>
         </div>
-    </el-card>
+        <div class="el-card__body">
+            <div id="models-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                <div class="empty-state">
+                    <i class="ph ph-spinner ph-spin"></i>
+                    <p>加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-// Add page-specific functionality to the main Vue app
-document.addEventListener('DOMContentLoaded', function() {
-    const modelsApp = {
-        data() {
-            return {
-                loading: false,
-                models: []
-            };
-        },
-        async mounted() {
-            await this.loadModels();
-        },
-        methods: {
-            async loadModels() {
-                this.loading = true;
-                try {
-                    const response = await fetch('/__admin__/api/models');
-                    const data = await response.json();
-                    
-                    // Get record count for each model
-                    const modelsWithCount = [];
-                    for (const model of data.models || []) {
-                        try {
-                            const countResponse = await fetch(`/__admin__/api/models/${model.name}?page=1&per_page=1`);
-                            const countData = await countResponse.json();
-                            modelsWithCount.push({
-                                ...model,
-                                record_count: countData.total || 0
-                            });
-                        } catch (error) {
-                            modelsWithCount.push({ ...model, record_count: 0 });
-                        }
-                    }
-                    
-                    this.models = modelsWithCount;
-                } catch (error) {
-                    ElementPlus.ElMessage.error('加载模型列表失败');
-                } finally {
-                    this.loading = false;
-                }
-            },
-            refreshModels() {
-                this.loadModels();
-            },
-            goToModel(modelName) {
-                window.location.href = `/__admin__/model/${modelName}`;
-            }
+async function loadModels() {
+    const container = document.getElementById('models-grid');
+
+    try {
+        const res = await fetch('/__admin__/api/models');
+        const data = await res.json();
+
+        const models = data.models || [];
+
+        if (!models.length) {
+            container.innerHTML = `
+                <div class="empty-state" style="grid-column: 1/-1;">
+                    <i class="ph ph-database"></i>
+                    <p>暂无可管理的模型</p>
+                </div>
+            `;
+            return;
         }
-    };
-    
-    // Mount the component to the specific element
-    if (document.getElementById('models-app')) {
-        const { createApp } = Vue;
-        createApp(modelsApp).use(ElementPlus).mount('#models-app');
+
+        container.innerHTML = models.map((model, index) => `
+            <div class="stat-card" style="cursor: pointer; flex-direction: column; align-items: stretch; gap: 12px;" onclick="window.location.href='/__admin__/model/${model.name}'">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="stat-icon" style="width: 40px; height: 40px; font-size: 16px; background: ${getModelColor(index)};">
+                        <i class="ph ph-table"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; font-size: 15px;">${model.name}</div>
+                        <div style="color: var(--text-secondary); font-size: 12px; font-family: monospace;">${model.table}</div>
+                    </div>
+                    <i class="ph ph-caret-right" style="color: var(--text-tertiary);"></i>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load models:', e);
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column: 1/-1;">
+                <i class="ph ph-warning"></i>
+                <p>加载失败</p>
+            </div>
+        `;
     }
-});
+}
+
+function getModelColor(index) {
+    const colors = [
+        'var(--primary-color)',
+        'var(--success-color)',
+        'var(--warning-color)',
+        '#8b5cf6',
+        '#ec4899',
+        '#06b6d4'
+    ];
+    return colors[index % colors.length];
+}
+
+document.addEventListener('DOMContentLoaded', loadModels);
 </script>
 {% endblock %}

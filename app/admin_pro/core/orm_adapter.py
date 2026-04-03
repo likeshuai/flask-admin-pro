@@ -10,16 +10,57 @@ class ORMAdapter:
     
     def __init__(self, db=None):
         self.db = db
+        self._models_cache = []
+    
+    def register_model(self, model):
+        """手动注册一个模型"""
+        if model not in self._models_cache:
+            self._models_cache.append(model)
     
     def get_models(self):
+        """获取所有注册的SQLAlchemy模型"""
         if self.db is None:
-            return []
-        # Get all models from the SQLAlchemy registry
-        models = []
-        for model_class in self.db.Model._decl_class_registry.values():
-            if hasattr(model_class, '__tablename__') and not model_class.__name__.startswith('_'):
-                models.append(model_class)
+            return self._models_cache
+        
+        models = list(self._models_cache)
+        
+        try:
+            # 方法1: SQLAlchemy 2.x / Flask-SQLAlchemy 3.x - 使用 registry.mappers
+            if hasattr(self.db.Model, 'registry') and hasattr(self.db.Model.registry, 'mappers'):
+                for mapper in self.db.Model.registry.mappers:
+                    model_class = mapper.class_
+                    if self._is_valid_model(model_class) and model_class not in models:
+                        models.append(model_class)
+                if models:
+                    return models
+        except Exception as e:
+            print(f"[ORMAdapter] Error getting models via registry.mappers: {e}")
+        
+        try:
+            # 方法2: 通过 metadata.tables 获取所有表,然后找到对应的模型类
+            if hasattr(self.db, 'metadata') and hasattr(self.db.metadata, 'tables'):
+                # 获取所有已注册的mapper
+                if hasattr(self.db.Model, 'registry') and hasattr(self.db.Model.registry, 'mappers'):
+                    for mapper in self.db.Model.registry.mappers:
+                        model_class = mapper.class_
+                        if self._is_valid_model(model_class) and model_class not in models:
+                            models.append(model_class)
+        except Exception as e:
+            print(f"[ORMAdapter] Error getting models via metadata: {e}")
+        
         return models
+    
+    def _is_valid_model(self, model_class):
+        """检查是否是有效的模型类"""
+        try:
+            return (
+                hasattr(model_class, '__tablename__') and 
+                hasattr(model_class, '__table__') and
+                not model_class.__name__.startswith('_') and
+                model_class.__name__ not in ['Model', 'Base']
+            )
+        except:
+            return False
     
     def get_model_by_name(self, name):
         models = self.get_models()

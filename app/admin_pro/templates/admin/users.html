@@ -1,229 +1,309 @@
 {% extends "admin/base.html" %}
+
 {% block title %}用户管理 - Flask Admin Pro{% endblock %}
+
+{% block breadcrumb_nav %}
+<a href="{{ url_for('admin.index') }}">首页</a>
+<span class="separator">/</span>
+<span class="current">用户管理</span>
+{% endblock %}
+
 {% block breadcrumb %}用户管理{% endblock %}
+
 {% block content %}
 <div id="users-app">
-    <el-card>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 24px; align-items: center;">
-            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                <el-input 
-                    v-model="search" 
-                    placeholder="搜索用户名..." 
-                    style="width: 240px;" 
-                    clearable
-                    prefix-icon="Search"
-                ></el-input>
-                <el-button @click="loadUsers" type="primary">
-                    <i class="el-icon-search"></i> 搜索
-                </el-button>
+    <div class="el-card">
+        <div class="el-card__header">
+            <span><i class="ph ph-users-three"></i> 用户列表</span>
+            <div class="quick-actions">
+                <input type="text" class="form-input" id="search-input" placeholder="搜索用户名..." style="width: 200px;" onkeyup="if(event.key==='Enter')loadUsers()">
+                <button class="el-button el-button--primary" onclick="showAddModal()">
+                    <i class="ph ph-user-plus"></i> 添加用户
+                </button>
             </div>
-            <el-button type="primary" @click="showCreate" size="large">
-                <i class="el-icon-plus"></i> 新增用户
-            </el-button>
         </div>
-        
-        <el-table :data="users" v-loading="loading" style="width: 100%;">
-            <el-table-column prop="id" label="ID" width="80" sortable></el-table-column>
-            <el-table-column prop="username" label="用户名" min-width="150">
-                <template #default="scope">
-                    <strong>{{ scope.row.username }}</strong>
-                </template>
-            </el-table-column>
-            <el-table-column prop="email" label="邮箱" min-width="200"></el-table-column>
-            <el-table-column prop="role" label="角色" width="120">
-                <template #default="scope">
-                    <el-tag :type="scope.row.role==='admin'?'danger':'info'" size="medium">{{ scope.row.role }}</el-tag>
-                </template>
-            </el-table-column>
-            <el-table-column prop="is_active" label="状态" width="100">
-                <template #default="scope">
-                    <el-tag :type="scope.row.is_active?'success':'info'" size="medium">{{ scope.row.is_active?'启用':'禁用' }}</el-tag>
-                </template>
-            </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" width="180"></el-table-column>
-            <el-table-column label="操作" width="220" fixed="right">
-                <template #default="scope">
-                    <el-button size="small" @click="showEdit(scope.row)" type="primary">
-                        <i class="el-icon-edit"></i> 编辑
-                    </el-button>
-                    <el-button size="small" type="danger" @click="handleDelete(scope.row)">
-                        <i class="el-icon-delete"></i> 删除
-                    </el-button>
-                </template>
-            </el-table-column>
-        </el-table>
-        
-        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
-            <el-pagination
-                v-model:current-page="page"
-                v-model:page-size="perPage"
-                :page-sizes="[10, 20, 50, 100]"
-                :total="total"
-                layout="total, sizes, prev, pager, next, jumper"
-                @size-change="loadUsers"
-                @current-change="loadUsers"
-            ></el-pagination>
+        <div class="el-card__body">
+            <table class="data-table" id="users-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 150px;">用户名</th>
+                        <th style="width: 200px;">邮箱</th>
+                        <th style="width: 100px;">角色</th>
+                        <th style="width: 80px;">状态</th>
+                        <th style="width: 160px;">创建时间</th>
+                        <th style="width: 140px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="users-body">
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <i class="ph ph-spinner ph-spin"></i>
+                            <p>加载中...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="pagination" id="pagination" style="margin-top: 20px; justify-content: center;"></div>
         </div>
-    </el-card>
-    
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="520px">
-        <el-form :model="form" ref="formRef" label-width="100px" :rules="rules">
-            <el-form-item label="用户名" prop="username">
-                <el-input v-model="form.username" placeholder="请输入用户名"></el-input>
-            </el-form-item>
-            <el-form-item label="邮箱" prop="email">
-                <el-input v-model="form.email" placeholder="请输入邮箱"></el-input>
-            </el-form-item>
-            <el-form-item :label="isEdit ? '新密码' : '密码'" :prop="isEdit ? '' : 'password'">
-                <el-input v-model="form.password" type="password" :placeholder="isEdit ? '留空不修改' : '请输入密码'"></el-input>
-            </el-form-item>
-            <el-form-item label="角色" prop="role">
-                <el-select v-model="form.role" placeholder="请选择角色">
-                    <el-option label="管理员" value="admin"></el-option>
-                    <el-option label="操作员" value="operator"></el-option>
-                </el-select>
-            </el-form-item>
-            <el-form-item label="状态" prop="is_active">
-                <el-switch v-model="form.is_active" active-text="启用" inactive-text="禁用"></el-switch>
-            </el-form-item>
-        </el-form>
-        <template #footer>
-            <el-button @click="dialogVisible = false">取消</el-button>
-            <el-button type="primary" @click="submit" :loading="submitting">确定</el-button>
-        </template>
-    </el-dialog>
+    </div>
 </div>
 
+<!-- Add/Edit Modal -->
+<div id="user-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span id="modal-title">添加用户</span>
+            <button class="modal-close-btn" onclick="closeModal()">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="user-id">
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 6px; font-weight: 500;">用户名 *</label>
+                <input type="text" id="user-username" class="form-input" placeholder="输入用户名">
+            </div>
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 6px; font-weight: 500;">邮箱</label>
+                <input type="email" id="user-email" class="form-input" placeholder="输入邮箱地址">
+            </div>
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 6px; font-weight: 500;">密码 <span id="password-hint"></span></label>
+                <input type="password" id="user-password" class="form-input" placeholder="输入密码">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">角色</label>
+                    <select id="user-role" class="form-input form-select">
+                        <option value="admin">管理员</option>
+                        <option value="editor">编辑</option>
+                        <option value="viewer">查看者</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">状态</label>
+                    <select id="user-active" class="form-input form-select">
+                        <option value="true">启用</option>
+                        <option value="false">禁用</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="el-button" onclick="closeModal()">取消</button>
+            <button class="el-button el-button--primary" onclick="saveUser()">保存</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const usersApp = {
-        data() {
-            return {
-                loading: false,
-                submitting: false,
-                users: [],
-                page: 1,
-                perPage: 20,
-                total: 0,
-                search: '',
-                dialogVisible: false,
-                isEdit: false,
-                editingUser: null,
-                form: {
-                    username: '',
-                    email: '',
-                    password: '',
-                    role: 'admin',
-                    is_active: true
-                },
-                rules: {
-                    username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-                    email: [{ type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }]
-                }
-            };
-        },
-        methods: {
-            async loadUsers() {
-                this.loading = true;
-                try {
-                    const response = await fetch(`/__admin__/api/users?page=${this.page}&per_page=${this.perPage}&search=${this.search}`);
-                    const data = await response.json();
-                    this.users = data.data || [];
-                    this.total = data.total || 0;
-                } catch (error) {
-                    ElementPlus.ElMessage.error('加载用户列表失败');
-                } finally {
-                    this.loading = false;
-                }
-            },
-            showCreate() {
-                this.isEdit = false;
-                this.editingUser = null;
-                this.form.username = '';
-                this.form.email = '';
-                this.form.password = '';
-                this.form.role = 'admin';
-                this.form.is_active = true;
-                this.dialogVisible = true;
-            },
-            showEdit(user) {
-                this.isEdit = true;
-                this.editingUser = user;
-                this.form.username = user.username;
-                this.form.email = user.email || '';
-                this.form.password = '';
-                this.form.role = user.role;
-                this.form.is_active = user.is_active;
-                this.dialogVisible = true;
-            },
-            async submit() {
-                this.submitting = true;
-                try {
-                    const formData = { ...this.form };
-                    if (this.isEdit && !formData.password) {
-                        delete formData.password;
-                    }
-                    
-                    const response = await fetch(
-                        this.isEdit ? `/__admin__/api/users/${this.editingUser.id}` : '/__admin__/api/users',
-                        {
-                            method: this.isEdit ? 'PUT' : 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(formData)
-                        }
-                    );
-                    
-                    const result = await response.json();
-                    if (result.success) {
-                        ElementPlus.ElMessage.success(this.isEdit ? '用户更新成功' : '用户创建成功');
-                        this.dialogVisible = false;
-                        this.loadUsers();
-                    } else {
-                        ElementPlus.ElMessage.error(result.error || '操作失败');
-                    }
-                } catch (error) {
-                    ElementPlus.ElMessage.error('网络错误');
-                } finally {
-                    this.submitting = false;
-                }
-            },
-            async handleDelete(user) {
-                try {
-                    await ElementPlus.ElMessageBox.confirm(
-                        `确定要删除用户 "${user.username}" 吗？此操作不可恢复。`,
-                        '确认删除',
-                        {
-                            confirmButtonText: '确定',
-                            cancelButtonText: '取消',
-                            type: 'warning'
-                        }
-                    );
-                    
-                    const response = await fetch(`/__admin__/api/users/${user.id}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    const result = await response.json();
-                    if (result.success) {
-                        ElementPlus.ElMessage.success('用户删除成功');
-                        this.loadUsers();
-                    } else {
-                        ElementPlus.ElMessage.error(result.error || '删除失败');
-                    }
-                } catch (error) {
-                    // User cancelled
-                }
-            }
-        },
-        async mounted() {
-            await this.loadUsers();
-        }
+let users = [];
+let currentPage = 1;
+let editingId = null;
+
+async function loadUsers(page = 1) {
+    currentPage = page;
+    const search = document.getElementById('search-input').value;
+    
+    try {
+        const params = new URLSearchParams({ page, per_page: 20 });
+        if (search) params.append('search', search);
+        
+        const res = await fetch(`/__admin__/api/users?${params}`);
+        const data = await res.json();
+        
+        users = data.items || [];
+        renderTable();
+        renderPagination(data);
+    } catch (e) {
+        console.error('Failed to load users:', e);
+        Toast.error('加载用户列表失败');
+    }
+}
+
+function renderTable() {
+    const tbody = document.getElementById('users-body');
+    
+    if (!users.length) {
+        tbody.innerHTML = `
+            <tr><td colspan="7" class="empty-state">
+                <i class="ph ph-users"></i>
+                <p>暂无用户数据</p>
+            </td></tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => `
+        <tr>
+            <td>${user.id}</td>
+            <td><strong>${user.username}</strong></td>
+            <td style="color: var(--text-secondary);">${user.email || '-'}</td>
+            <td>${getRoleBadge(user.role)}</td>
+            <td>${user.is_active ? '<span class="badge badge--success">启用</span>' : '<span class="badge badge--danger">禁用</span>'}</td>
+            <td style="color: var(--text-secondary); font-size: 13px;">${formatTime(user.created_at)}</td>
+            <td>
+                <div class="table-actions">
+                    <button class="el-button el-button--text el-button--small" onclick="editUser(${user.id})">
+                        <i class="ph ph-pencil"></i> 编辑
+                    </button>
+                    <button class="el-button el-button--text el-button--small" style="color: var(--danger-color);" onclick="deleteUser(${user.id})">
+                        <i class="ph ph-trash"></i> 删除
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function getRoleBadge(role) {
+    const badges = {
+        'admin': '<span class="badge badge--primary">管理员</span>',
+        'editor': '<span class="badge badge--warning">编辑</span>',
+        'viewer': '<span class="badge badge--info">查看者</span>',
+    };
+    return badges[role] || `<span class="badge">${role}</span>`;
+}
+
+function formatTime(isoStr) {
+    if (!isoStr) return '-';
+    return new Date(isoStr).toLocaleString('zh-CN', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+    });
+}
+
+function showAddModal() {
+    editingId = null;
+    document.getElementById('modal-title').textContent = '添加用户';
+    document.getElementById('user-id').value = '';
+    document.getElementById('user-username').value = '';
+    document.getElementById('user-email').value = '';
+    document.getElementById('user-password').value = '';
+    document.getElementById('user-role').value = 'admin';
+    document.getElementById('user-active').value = 'true';
+    document.getElementById('password-hint').textContent = '*';
+    document.getElementById('user-modal').style.display = 'flex';
+}
+
+function editUser(id) {
+    const user = users.find(u => u.id === id);
+    if (!user) return;
+    
+    editingId = id;
+    document.getElementById('modal-title').textContent = '编辑用户';
+    document.getElementById('user-id').value = id;
+    document.getElementById('user-username').value = user.username;
+    document.getElementById('user-email').value = user.email || '';
+    document.getElementById('user-password').value = '';
+    document.getElementById('user-role').value = user.role || 'admin';
+    document.getElementById('user-active').value = user.is_active ? 'true' : 'false';
+    document.getElementById('password-hint').textContent = '(留空保持不变)';
+    document.getElementById('user-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('user-modal').style.display = 'none';
+    editingId = null;
+}
+
+async function saveUser() {
+    const data = {
+        username: document.getElementById('user-username').value.trim(),
+        email: document.getElementById('user-email').value.trim(),
+        role: document.getElementById('user-role').value,
+        is_active: document.getElementById('user-active').value === 'true',
     };
     
-    if (document.getElementById('users-app')) {
-        const { createApp } = Vue;
-        createApp(usersApp).use(ElementPlus).mount('#users-app');
+    const password = document.getElementById('user-password').value;
+    if (password) {
+        data.password = password;
     }
-});
+    
+    if (!data.username) {
+        Toast.warning('请输入用户名');
+        return;
+    }
+    
+    if (!editingId && !password) {
+        Toast.warning('请输入密码');
+        return;
+    }
+    
+    try {
+        let url = '/__admin__/api/users';
+        let method = 'POST';
+        
+        if (editingId) {
+            url = `/__admin__/api/users/${editingId}`;
+            method = 'PUT';
+        }
+        
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        
+        const result = await res.json();
+        
+        if (result.success) {
+            closeModal();
+            Toast.success(editingId ? '更新成功' : '添加成功');
+            loadUsers(currentPage);
+        } else {
+            Toast.error(result.error || '保存失败');
+        }
+    } catch (e) {
+        Toast.error('保存失败: ' + e.message);
+    }
+}
+
+async function deleteUser(id) {
+    if (!confirm('确定要删除此用户吗？')) return;
+    
+    try {
+        const res = await fetch(`/__admin__/api/users/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        
+        if (result.success) {
+            Toast.success('删除成功');
+            loadUsers(currentPage);
+        } else {
+            Toast.error(result.error || '删除失败');
+        }
+    } catch (e) {
+        Toast.error('删除失败: ' + e.message);
+    }
+}
+
+function renderPagination(data) {
+    const container = document.getElementById('pagination');
+    if (!data.pages || data.pages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = `<span>共 ${data.total} 条</span>`;
+    
+    if (currentPage > 1) {
+        html += `<button class="el-button el-button--small" onclick="loadUsers(${currentPage - 1})">上一页</button>`;
+    }
+    
+    html += `<span>第 ${currentPage} / ${data.pages} 页</span>`;
+    
+    if (currentPage < data.pages) {
+        html += `<button class="el-button el-button--small" onclick="loadUsers(${currentPage + 1})">下一页</button>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', loadUsers);
 </script>
 {% endblock %}

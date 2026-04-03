@@ -17,7 +17,7 @@ export function logout() {
 
 export function getCurrentUser() {
   return request({
-    url: '/current-user',
+    url: '/me',
     method: 'get'
   })
 }
